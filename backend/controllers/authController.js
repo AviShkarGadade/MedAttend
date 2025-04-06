@@ -119,11 +119,8 @@ exports.login = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: "User not found",
-        user: null,  // Ensure user key exists
-      });
+      })
     }
-    res.json({ success: true, user });
-    
 
     // Check if faculty is approved
     if (user.role === "faculty" && !user.isApproved) {

@@ -1,7 +1,4 @@
-import { OpenCage } from "opencage-api-client"
-
-// Initialize OpenCage with API key
-const opencage = new OpenCage({ key: process.env.OPENCAGE_API_KEY || "" })
+import opencage from 'opencage-api-client'
 
 interface Coordinates {
   latitude: number

@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { Search, Download, Plus, Trash2, Edit, Filter } from "lucide-react"
+import { Search, Download, Plus, Trash2, Edit, Filter, UserPlus } from "lucide-react"
 import { AdminDashboardHeader } from "@/components/admin-dashboard-header"
 import {
   Dialog,
@@ -20,8 +20,8 @@ import {
 } from "@/components/ui/dialog"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { getAuth, onAuthStateChanged } from "firebase/auth"
-import { userService, departmentService } from "@/services/api"
 import { AlertCircle } from "lucide-react"
+import { departmentService, userService } from "@/frontend/src/services/api"
 
 export default function AdminUsersPage() {
   const [user, setUser] = useState<any>(null)
@@ -135,10 +135,16 @@ export default function AdminUsersPage() {
             <h1 className="text-2xl font-bold">User Management</h1>
             <p className="text-muted-foreground">Manage students and faculty accounts</p>
           </div>
-          <Button onClick={() => router.push("/admin/add-user")}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add User
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={() => router.push("/admin/add-user")}>
+              <UserPlus className="h-4 w-4 mr-2" />
+              Add Faculty
+            </Button>
+            <Button onClick={() => router.push("/admin/add-student")}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Student
+            </Button>
+          </div>
         </div>
 
         {error && (

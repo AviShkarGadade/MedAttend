@@ -1,7 +1,8 @@
+
 require("dotenv").config()
 const { MongoClient, ObjectId } = require("mongodb")
 const bcrypt = require("bcryptjs")
-const { admin } = require("../backend/config/firebase")
+const admin = require("firebase-admin")
 
 const MONGODB_URI = process.env.MONGODB_URI
 const MONGODB_DB = process.env.MONGODB_DB
@@ -12,6 +13,20 @@ if (!MONGODB_URI) {
 
 if (!MONGODB_DB) {
   throw new Error("Please define the MONGODB_DB environment variable")
+}
+
+// Initialize Firebase Admin SDK
+const serviceAccount = {
+  projectId: process.env.FIREBASE_ADMIN_PROJECT_ID,
+  clientEmail: process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
+  privateKey: process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, "\n"),
+}
+
+// Check if Firebase Admin is already initialized
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+  })
 }
 
 async function seed() {
@@ -121,40 +136,63 @@ async function seed() {
     const hospitalResult = await db.collection("hospitals").insertMany(hospitals)
     console.log(`${hospitalResult.insertedCount} hospitals inserted`)
 
-    // Create admin user in Firebase
-    let adminFirebaseUid
-    try {
-      const adminUser = await admin.auth().createUser({
+    // Create admin users in Firebase
+    const adminData = [
+      {
+        name: "Admin User",
         email: "admin@medattend.com",
         password: "password123",
-        displayName: "Admin User",
-      })
-      adminFirebaseUid = adminUser.uid
-      console.log("Admin user created in Firebase")
-    } catch (error) {
-      // If user already exists, get the UID
-      if (error.code === "auth/email-already-exists") {
-        const adminUser = await admin.auth().getUserByEmail("admin@medattend.com")
-        adminFirebaseUid = adminUser.uid
-        console.log("Admin user already exists in Firebase")
-      } else {
-        throw error
+        role: "admin",
+        department: departmentResult.insertedIds[0],
+      },
+      {
+        name: "System Admin",
+        email: "sysadmin@medattend.com",
+        password: "password123",
+        role: "admin",
+        department: departmentResult.insertedIds[1],
+      },
+    ]
+
+    const adminUsers = []
+    for (const adminUser of adminData) {
+      // Create user in Firebase
+      let firebaseUid
+      try {
+        const userRecord = await admin.auth().createUser({
+          email: adminUser.email,
+          password: adminUser.password,
+          displayName: adminUser.name,
+        })
+        firebaseUid = userRecord.uid
+        console.log(`Admin user ${adminUser.email} created in Firebase`)
+      } catch (error) {
+        // If user already exists, get the UID
+        if (error.code === "auth/email-already-exists") {
+          const userRecord = await admin.auth().getUserByEmail(adminUser.email)
+          firebaseUid = userRecord.uid
+          console.log(`Admin user ${adminUser.email} already exists in Firebase`)
+        } else {
+          throw error
+        }
       }
+
+      // Create admin user in MongoDB
+      const adminUserDoc = {
+        firebaseUid: firebaseUid,
+        name: adminUser.name,
+        email: adminUser.email,
+        role: adminUser.role,
+        department: adminUser.department,
+        isApproved: true,
+        createdAt: new Date(),
+      }
+
+      adminUsers.push(adminUserDoc)
     }
 
-    // Create admin user in MongoDB
-    const adminUser = {
-      firebaseUid: adminFirebaseUid,
-      name: "Admin User",
-      email: "admin@medattend.com",
-      role: "admin",
-      department: departmentResult.insertedIds[0],
-      isApproved: true,
-      createdAt: new Date(),
-    }
-
-    const adminResult = await db.collection("users").insertOne(adminUser)
-    console.log("Admin user created in MongoDB")
+    const adminResult = await db.collection("users").insertMany(adminUsers)
+    console.log(`${adminResult.insertedCount} admin users created in MongoDB`)
 
     // Create faculty users
     const facultyData = [
@@ -244,7 +282,7 @@ async function seed() {
     const pendingFaculty = facultyUsers.find((f) => !f.isApproved)
     if (pendingFaculty) {
       await db.collection("notifications").insertOne({
-        recipient: adminResult.insertedId,
+        recipient: adminResult.insertedIds[0],
         title: "New Faculty Registration",
         message: `${pendingFaculty.name} has registered as faculty and is awaiting approval.`,
         type: "approval",

@@ -17,64 +17,55 @@ if (!getApps().length) {
 export async function POST(request: NextRequest) {
   try {
     const { token } = await request.json()
-
-    if (!token) {
-      return NextResponse.json({ message: "Token is required" }, { status: 400 })
-    }
+    console.log("Test role request received with token")
 
     // Verify the Firebase ID token
     const decodedToken = await getAuth().verifyIdToken(token)
     const uid = decodedToken.uid
+    console.log("Token verified for UID:", uid)
 
     // Connect to MongoDB
     const { db } = await connectToDatabase()
 
     // Find the user in the database
     const user = await db.collection("users").findOne({ firebaseUid: uid })
+    console.log("User found:", user)
 
     if (!user) {
-      console.error(`User not found for firebaseUid: ${uid}`)
-      return NextResponse.json({ message: "User not found" }, { status: 404 })
-    }
-
-    // Check if faculty account is approved
-    if (user.role === "faculty" && !user.isApproved) {
-      console.log(`Faculty account pending approval: ${user.email}`)
       return NextResponse.json(
         {
-          message: "Faculty account pending approval",
-          user: {
-            id: user._id,
-            name: user.name,
-            email: user.email,
-            role: "pending",
-            isApproved: false,
-          },
+          success: false,
+          message: "User not found",
+          uid: uid,
         },
-        { status: 403 },
+        { status: 404 },
       )
     }
 
-    // Return user data with role
-    console.log(`User verified successfully: ${user.email} (${user.role})`)
+    // Return detailed user data for debugging
     return NextResponse.json({
       success: true,
       user: {
         id: user._id,
+        firebaseUid: user.firebaseUid,
         name: user.name,
         email: user.email,
         role: user.role,
         department: user.department,
         hospital: user.hospital,
-        studentId: user.studentId,
-        facultyId: user.facultyId,
-        year: user.year,
         isApproved: user.isApproved,
       },
     })
   } catch (error: any) {
-    console.error("Authentication error:", error)
-    return NextResponse.json({ message: error.message || "Authentication failed" }, { status: 401 })
+    console.error("Test role error:", error)
+    return NextResponse.json(
+      {
+        success: false,
+        message: error.message || "Authentication failed",
+        error: error.stack,
+      },
+      { status: 401 },
+    )
   }
 }
 

@@ -4,10 +4,10 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Users, UserPlus, Building, Settings, AlertCircle } from "lucide-react"
+import { Users, UserPlus, Building, Settings, AlertCircle, Plus } from "lucide-react"
 import { AdminDashboardHeader } from "@/components/admin-dashboard-header"
 import { getAuth, onAuthStateChanged } from "firebase/auth"
-import { DashboardFallback } from "@/components/dashboard-fallback"
+import { DashboardFallback } from "@/app/components/dashboard-fallback"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
 export default function AdminDashboard() {
@@ -146,7 +146,11 @@ export default function AdminDashboard() {
           <div className="flex gap-2">
             <Button onClick={() => router.push("/admin/add-user")}>
               <UserPlus className="h-4 w-4 mr-2" />
-              Add User
+              Add Faculty
+            </Button>
+            <Button onClick={() => router.push("/admin/add-student")}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Student
             </Button>
             <Button variant="outline" onClick={() => router.push("/admin/settings")}>
               <Settings className="h-4 w-4 mr-2" />

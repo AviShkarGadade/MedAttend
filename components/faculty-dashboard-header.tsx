@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -11,25 +12,21 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Hospital, Menu, Bell, User, LogOut, Settings } from "lucide-react"
-import { getAuth, signOut } from "firebase/auth"
-import { useRouter } from "next/navigation"
+import { signOut } from "firebase/auth"
+import { auth } from "@/lib/firebase"
 
 interface FacultyDashboardHeaderProps {
-  user: {
-    name: string
-    id: string
-    department: string
-    hospital: string
-  }
+  user: any
 }
 
 export function FacultyDashboardHeader({ user }: FacultyDashboardHeaderProps) {
   const router = useRouter()
 
   const handleSignOut = async () => {
-    const auth = getAuth()
     try {
       await signOut(auth)
+      localStorage.removeItem("authToken")
+      localStorage.removeItem("user")
       router.push("/login")
     } catch (error) {
       console.error("Error signing out:", error)
@@ -77,19 +74,23 @@ export function FacultyDashboardHeader({ user }: FacultyDashboardHeaderProps) {
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>
                 <div className="flex flex-col space-y-1">
-                  <p className="font-medium">{user.name}</p>
-                  <p className="text-xs text-muted-foreground">{user.department}</p>
-                  <p className="text-xs text-muted-foreground">{user.hospital}</p>
+                  <p className="font-medium">{user?.name || "Faculty User"}</p>
+                  <p className="text-xs text-muted-foreground">{user?.department || "Department"}</p>
+                  <p className="text-xs text-muted-foreground">{user?.hospital || "Hospital"}</p>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>
-                <User className="mr-2 h-4 w-4" />
-                <span>Profile</span>
+              <DropdownMenuItem asChild>
+                <Link href="/faculty/profile">
+                  <User className="mr-2 h-4 w-4" />
+                  <span>Profile</span>
+                </Link>
               </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Settings className="mr-2 h-4 w-4" />
-                <span>Settings</span>
+              <DropdownMenuItem asChild>
+                <Link href="/faculty/settings">
+                  <Settings className="mr-2 h-4 w-4" />
+                  <span>Settings</span>
+                </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleSignOut}>

@@ -25,9 +25,9 @@ export default function Home() {
 
       <main className="flex-1 container mx-auto px-4 py-8">
         <section className="mb-12 text-center">
-          <h1 className="text-4xl font-bold mb-4">Medical Intern Attendance Management</h1>
+          <h1 className="text-4xl font-bold mb-4">Medical Students Attendance Management</h1>
           <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-            Streamline attendance tracking for medical interns across multiple hospital with geolocation and
+            Streamline attendance tracking for medical interns across multiple hospital rotations with geolocation and
             QR code verification.
           </p>
         </section>
@@ -69,8 +69,8 @@ export default function Home() {
         <section className="bg-muted rounded-lg p-8 text-center">
           <h2 className="text-2xl font-bold mb-4">Ready to get started?</h2>
           <div className="flex justify-center gap-4">
-            <Link href="/register">
-              <Button size="lg">Sign Up Now</Button>
+            <Link href="/login">
+              <Button size="lg">Sign In Now</Button>
             </Link>
             <Link href="/about">
               <Button variant="outline" size="lg">

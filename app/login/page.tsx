@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -9,23 +9,11 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Hospital, Mail, Lock, AlertCircle } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-// Import Firebase modules individually to avoid webpack issues
-import { initializeApp } from "firebase/app"
-import { getAuth, signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from "firebase/auth"
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth"
+import { auth } from "@/lib/firebase"
+import { useAuth } from "@/components/auth-provider"
 
-// Firebase configuration
-const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-}
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig)
-const auth = getAuth(app)
+// Initialize Google provider
 const googleProvider = new GoogleAuthProvider()
 
 export default function LoginPage() {
@@ -33,111 +21,8 @@ export default function LoginPage() {
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
-  const [initialLoading, setInitialLoading] = useState(true)
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
   const router = useRouter()
-
-  // Check if user is already logged in
-  useEffect(() => {
-    // Clear any potential loop detection from previous sessions
-    sessionStorage.removeItem("auth_redirect_count")
-
-    const checkAuthStatus = async () => {
-      try {
-        // Check if we have user data in localStorage
-        const storedUser = localStorage.getItem("user")
-        if (storedUser) {
-          try {
-            const userData = JSON.parse(storedUser)
-            setIsAuthenticated(true)
-            setInitialLoading(false)
-
-            // Don't auto-redirect here - let the user choose
-            return
-          } catch (err) {
-            console.error("Error parsing stored user data:", err)
-            localStorage.removeItem("user")
-          }
-        }
-
-        // If no stored user, check Firebase auth state
-        const auth = getAuth()
-        const user = auth.currentUser
-
-        if (user) {
-          try {
-            // Get ID token
-            const idToken = await user.getIdToken()
-
-            // Verify with backend
-            const response = await fetch("/api/auth/me", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({ token: idToken }),
-            })
-
-            if (response.ok) {
-              const data = await response.json()
-              localStorage.setItem("authToken", idToken)
-              localStorage.setItem("user", JSON.stringify(data.user))
-              setIsAuthenticated(true)
-            } else {
-              // Invalid token or user not found - clear auth data
-              localStorage.removeItem("authToken")
-              localStorage.removeItem("user")
-              setIsAuthenticated(false)
-            }
-          } catch (error) {
-            console.error("Error checking auth status:", error)
-            setIsAuthenticated(false)
-          }
-        } else {
-          setIsAuthenticated(false)
-        }
-
-        setInitialLoading(false)
-      } catch (error) {
-        console.error("Error in auth check:", error)
-        setInitialLoading(false)
-        setIsAuthenticated(false)
-      }
-    }
-
-    checkAuthStatus()
-  }, [])
-
-  const redirectBasedOnRole = (role) => {
-    // Get current redirect count to prevent loops
-    const redirectCount = Number.parseInt(sessionStorage.getItem("auth_redirect_count") || "0")
-
-    // If we've redirected too many times, don't redirect again
-    if (redirectCount > 3) {
-      console.error("Too many redirects detected - possible redirect loop")
-      sessionStorage.removeItem("auth_redirect_count")
-      setError("Login error: Too many redirects detected. Please try again later.")
-      return
-    }
-
-    // Increment redirect count
-    sessionStorage.setItem("auth_redirect_count", (redirectCount + 1).toString())
-
-    // Redirect based on role
-    switch (role) {
-      case "admin":
-        router.push("/admin/dashboard")
-        break
-      case "faculty":
-        router.push("/faculty/dashboard")
-        break
-      case "student":
-        router.push("/student/dashboard")
-        break
-      default:
-        router.push("/")
-    }
-  }
+  const { user, firebaseUser } = useAuth()
 
   const handleEmailLogin = async (e) => {
     e.preventDefault()
@@ -147,39 +32,12 @@ export default function LoginPage() {
       setError("")
 
       // Sign in with Firebase
-      const userCredential = await signInWithEmailAndPassword(auth, email, password)
+      await signInWithEmailAndPassword(auth, email, password)
 
-      // Get ID token
-      const idToken = await userCredential.user.getIdToken()
-
-      // Call backend to verify user and get role
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ token: idToken }),
-      })
-
-      const data = await response.json()
-
-      if (response.ok) {
-        // Store user data in localStorage for persistence
-        localStorage.setItem("authToken", idToken)
-        localStorage.setItem("user", JSON.stringify(data.user))
-        setIsAuthenticated(true)
-
-        // Reset redirect count before redirecting
-        sessionStorage.setItem("auth_redirect_count", "0")
-
-        // Redirect based on user role
-        redirectBasedOnRole(data.user.role)
-      } else {
-        setError(data.message || "Failed to authenticate")
-      }
+      // The AuthProvider will handle the rest (token, backend verification, redirection)
     } catch (err) {
-      setError(err.message || "Failed to login")
       console.error("Login error:", err)
+      setError(err.message || "Failed to login")
     } finally {
       setLoading(false)
     }
@@ -191,46 +49,39 @@ export default function LoginPage() {
       setError("")
 
       // Sign in with Google
-      const result = await signInWithPopup(auth, googleProvider)
+      await signInWithPopup(auth, googleProvider)
 
-      // Get ID token
-      const idToken = await result.user.getIdToken()
-
-      // Call backend to verify user and get role
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ token: idToken }),
-      })
-
-      const data = await response.json()
-
-      if (response.ok) {
-        // Store user data in localStorage for persistence
-        localStorage.setItem("authToken", idToken)
-        localStorage.setItem("user", JSON.stringify(data.user))
-        setIsAuthenticated(true)
-
-        // Reset redirect count before redirecting
-        sessionStorage.setItem("auth_redirect_count", "0")
-
-        // Redirect based on user role
-        redirectBasedOnRole(data.user.role)
-      } else {
-        setError(data.message || "Failed to authenticate")
-      }
+      // The AuthProvider will handle the rest
     } catch (err) {
-      setError(err.message || "Failed to login with Google")
       console.error("Google login error:", err)
+      setError(err.message || "Failed to login with Google")
     } finally {
       setLoading(false)
     }
   }
 
-  if (initialLoading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>
+  const handleSignOut = async () => {
+    try {
+      await signOut(auth)
+      localStorage.removeItem("authToken")
+      localStorage.removeItem("user")
+    } catch (err) {
+      console.error("Error signing out:", err)
+    }
+  }
+
+  const handleGoToDashboard = () => {
+    if (user) {
+      if (user.role === "admin") {
+        router.push("/admin/dashboard")
+      } else if (user.role === "faculty") {
+        router.push("/faculty/dashboard")
+      } else if (user.role === "student") {
+        router.push("/student/dashboard")
+      } else if (user.role === "pending") {
+        router.push("/pending-approval")
+      }
+    }
   }
 
   return (
@@ -242,15 +93,6 @@ export default function LoginPage() {
           </div>
           <CardTitle className="text-2xl">Sign in to MedAttend</CardTitle>
           <CardDescription>Enter your credentials to access your account</CardDescription>
-
-          {isAuthenticated && (
-            <Alert className="mt-4 bg-green-50 border-green-200">
-              <AlertCircle className="h-4 w-4 text-green-500" />
-              <AlertDescription className="text-green-700">
-                You are already signed in. Choose an option below.
-              </AlertDescription>
-            </Alert>
-          )}
         </CardHeader>
 
         <CardContent className="space-y-4">
@@ -261,27 +103,20 @@ export default function LoginPage() {
             </Alert>
           )}
 
-          {isAuthenticated ? (
+          {firebaseUser ? (
             <div className="space-y-4">
-              <Button
-                className="w-full"
-                onClick={() => {
-                  const userData = JSON.parse(localStorage.getItem("user") || "{}")
-                  redirectBasedOnRole(userData.role || "student")
-                }}
-              >
+              <Alert className="bg-green-50 border-green-200">
+                <AlertCircle className="h-4 w-4 text-green-500" />
+                <AlertDescription className="text-green-700">
+                  You are already signed in as {firebaseUser.email}
+                </AlertDescription>
+              </Alert>
+
+              <Button className="w-full" onClick={handleGoToDashboard}>
                 Go to Dashboard
               </Button>
 
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => {
-                  localStorage.removeItem("authToken")
-                  localStorage.removeItem("user")
-                  setIsAuthenticated(false)
-                }}
-              >
+              <Button variant="outline" className="w-full" onClick={handleSignOut}>
                 Sign Out
               </Button>
             </div>

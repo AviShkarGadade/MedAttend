@@ -29,24 +29,47 @@ export async function POST(request: NextRequest) {
     const user = await db.collection("users").findOne({ firebaseUid: uid })
 
     if (!user) {
+      console.error(`User not found for firebaseUid: ${uid}`)
       return NextResponse.json({ message: "User not found" }, { status: 404 })
     }
 
     // Check if faculty account is approved
     if (user.role === "faculty" && !user.isApproved) {
-      return NextResponse.json({ message: "Faculty account pending approval" }, { status: 403 })
+      console.log(`Faculty account pending approval: ${user.email}`)
+      return NextResponse.json(
+        {
+          message: "Faculty account pending approval",
+          user: {
+            id: user._id,
+            name: user.name,
+            email: user.email,
+            role: "pending",
+            isApproved: false,
+          },
+        },
+        { status: 403 },
+      )
     }
 
     // Return user data with role
+    console.log(`User authenticated successfully: ${user.email} (${user.role})`)
     return NextResponse.json({
-      id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
+      success: true,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        department: user.department,
+        hospital: user.hospital,
+        studentId: user.studentId,
+        facultyId: user.facultyId,
+        year: user.year,
+        isApproved: user.isApproved,
+      },
     })
   } catch (error: any) {
     console.error("Login error:", error)
-
     return NextResponse.json({ message: error.message || "Authentication failed" }, { status: 401 })
   }
 }

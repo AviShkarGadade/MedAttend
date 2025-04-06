@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -11,25 +12,21 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Hospital, Menu, Bell, User, LogOut, Settings } from "lucide-react"
-import { getAuth, signOut } from "firebase/auth"
-import { useRouter } from "next/navigation"
+import { signOut } from "firebase/auth"
+import { auth } from "@/lib/firebase"
 
 interface StudentDashboardHeaderProps {
-  user: {
-    name: string
-    id: string
-    department: string
-    year: number
-  }
+  user: any
 }
 
 export function StudentDashboardHeader({ user }: StudentDashboardHeaderProps) {
   const router = useRouter()
 
   const handleSignOut = async () => {
-    const auth = getAuth()
     try {
       await signOut(auth)
+      localStorage.removeItem("authToken")
+      localStorage.removeItem("user")
       router.push("/login")
     } catch (error) {
       console.error("Error signing out:", error)
@@ -77,18 +74,22 @@ export function StudentDashboardHeader({ user }: StudentDashboardHeaderProps) {
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>
                 <div className="flex flex-col space-y-1">
-                  <p className="font-medium">{user.name}</p>
-                  <p className="text-xs text-muted-foreground">ID: {user.id}</p>
+                  <p className="font-medium">{user?.name || "Student User"}</p>
+                  <p className="text-xs text-muted-foreground">ID: {user?.studentId || "MED2023XXX"}</p>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>
-                <User className="mr-2 h-4 w-4" />
-                <span>Profile</span>
+              <DropdownMenuItem asChild>
+                <Link href="/student/profile">
+                  <User className="mr-2 h-4 w-4" />
+                  <span>Profile</span>
+                </Link>
               </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Settings className="mr-2 h-4 w-4" />
-                <span>Settings</span>
+              <DropdownMenuItem asChild>
+                <Link href="/student/settings">
+                  <Settings className="mr-2 h-4 w-4" />
+                  <span>Settings</span>
+                </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleSignOut}>

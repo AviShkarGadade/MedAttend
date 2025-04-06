@@ -35,11 +35,9 @@ export default function RegisterPage() {
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [role, setRole] = useState("")
-  const [studentId, setStudentId] = useState("")
+  const [role, setRole] = useState("faculty") // Default to faculty
   const [facultyId, setFacultyId] = useState("")
   const [department, setDepartment] = useState("")
-  const [year, setYear] = useState("")
   const [hospital, setHospital] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
@@ -55,8 +53,6 @@ export default function RegisterPage() {
     { id: "dept6", name: "Emergency Medicine" },
   ]
 
-  const years = [3, 4, 5]
-
   const hospitals = [
     { id: "hosp1", name: "City General Hospital" },
     { id: "hosp2", name: "University Hospital" },
@@ -68,17 +64,12 @@ export default function RegisterPage() {
   const handleEmailRegister = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!role) {
-      setError("Please select a role")
+    if (role !== "faculty") {
+      setError("Only faculty registration is allowed. Students must be added by administrators.")
       return
     }
 
-    if (role === "student" && (!studentId || !department || !year)) {
-      setError("Please fill in all required student information")
-      return
-    }
-
-    if (role === "faculty" && (!facultyId || !department || !hospital)) {
+    if (!facultyId || !department || !hospital) {
       setError("Please fill in all required faculty information")
       return
     }
@@ -95,21 +86,10 @@ export default function RegisterPage() {
         token: idToken,
         name,
         email,
-        role,
-      }
-
-      if (role === "student") {
-        Object.assign(userData, {
-          studentId,
-          department,
-          year: Number.parseInt(year),
-        })
-      } else if (role === "faculty") {
-        Object.assign(userData, {
-          facultyId,
-          department,
-          hospital,
-        })
+        role: "faculty",
+        facultyId,
+        department,
+        hospital,
       }
 
       // Call backend to create user profile with role
@@ -125,21 +105,11 @@ export default function RegisterPage() {
 
       if (response.ok) {
         // Redirect to appropriate dashboard based on role
-        switch (role) {
-          case "student":
-            router.push("/student/dashboard")
-            break
-          case "faculty":
-            // Faculty accounts need admin approval
-            router.push("/pending-approval")
-            break
-          default:
-            router.push("/profile/setup")
-        }
+        router.push("/pending-approval")
       } else {
         setError(data.message || "Failed to create account")
       }
-    } catch (err: any) {
+    } catch (err) {
       setError(err.message || "Failed to register")
     } finally {
       setLoading(false)
@@ -147,17 +117,12 @@ export default function RegisterPage() {
   }
 
   const handleGoogleRegister = async () => {
-    if (!role) {
-      setError("Please select a role before continuing with Google")
+    if (role !== "faculty") {
+      setError("Only faculty registration is allowed. Students must be added by administrators.")
       return
     }
 
-    if (role === "student" && (!studentId || !department || !year)) {
-      setError("Please fill in all required student information before continuing with Google")
-      return
-    }
-
-    if (role === "faculty" && (!facultyId || !department || !hospital)) {
+    if (!facultyId || !department || !hospital) {
       setError("Please fill in all required faculty information before continuing with Google")
       return
     }
@@ -174,21 +139,10 @@ export default function RegisterPage() {
         token: idToken,
         name: result.user.displayName || name,
         email: result.user.email,
-        role,
-      }
-
-      if (role === "student") {
-        Object.assign(userData, {
-          studentId,
-          department,
-          year: Number.parseInt(year),
-        })
-      } else if (role === "faculty") {
-        Object.assign(userData, {
-          facultyId,
-          department,
-          hospital,
-        })
+        role: "faculty",
+        facultyId,
+        department,
+        hospital,
       }
 
       // Call backend to create user profile with role
@@ -204,21 +158,11 @@ export default function RegisterPage() {
 
       if (response.ok) {
         // Redirect to appropriate dashboard based on role
-        switch (role) {
-          case "student":
-            router.push("/student/dashboard")
-            break
-          case "faculty":
-            // Faculty accounts need admin approval
-            router.push("/pending-approval")
-            break
-          default:
-            router.push("/profile/setup")
-        }
+        router.push("/pending-approval")
       } else {
         setError(data.message || "Failed to create account")
       }
-    } catch (err: any) {
+    } catch (err) {
       setError(err.message || "Failed to register with Google")
     } finally {
       setLoading(false)
@@ -232,8 +176,14 @@ export default function RegisterPage() {
           <div className="flex justify-center mb-2">
             <Hospital className="h-10 w-10 text-primary" />
           </div>
-          <CardTitle className="text-2xl">Create an account</CardTitle>
-          <CardDescription>Enter your information to create your MedAttend account</CardDescription>
+          <CardTitle className="text-2xl">Create a Faculty Account</CardTitle>
+          <CardDescription>Enter your information to create your MedAttend faculty account</CardDescription>
+          <Alert className="mt-2 bg-blue-50 border-blue-200">
+            <AlertCircle className="h-4 w-4 text-blue-500" />
+            <AlertDescription className="text-blue-700">
+              Note: Student accounts can only be created by administrators.
+            </AlertDescription>
+          </Alert>
         </CardHeader>
         <CardContent className="space-y-4">
           {error && (
@@ -293,122 +243,54 @@ export default function RegisterPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="role">Role</Label>
-                <Select value={role} onValueChange={setRole} required>
+                <Label htmlFor="facultyId">Faculty ID</Label>
+                <div className="relative">
+                  <BookOpen className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="facultyId"
+                    placeholder="FAC2023XXX"
+                    className="pl-10"
+                    value={facultyId}
+                    onChange={(e) => setFacultyId(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="department">Department</Label>
+                <Select value={department} onValueChange={setDepartment} required>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select your role" />
+                    <SelectValue placeholder="Select department" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="student">Medical Intern/Student</SelectItem>
-                    <SelectItem value="faculty">Faculty/Supervisor</SelectItem>
+                    {departments.map((dept) => (
+                      <SelectItem key={dept.id} value={dept.name}>
+                        {dept.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
 
-              {role === "student" && (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="studentId">Student ID</Label>
-                    <div className="relative">
-                      <BookOpen className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="studentId"
-                        placeholder="MED2023XXX"
-                        className="pl-10"
-                        value={studentId}
-                        onChange={(e) => setStudentId(e.target.value)}
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="department">Department</Label>
-                    <Select value={department} onValueChange={setDepartment} required>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select department" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {departments.map((dept) => (
-                          <SelectItem key={dept.id} value={dept.name}>
-                            {dept.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="year">Year</Label>
-                    <Select value={year} onValueChange={setYear} required>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select year" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {years.map((y) => (
-                          <SelectItem key={y} value={y.toString()}>
-                            Year {y}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </>
-              )}
-
-              {role === "faculty" && (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="facultyId">Faculty ID</Label>
-                    <div className="relative">
-                      <BookOpen className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="facultyId"
-                        placeholder="FAC2023XXX"
-                        className="pl-10"
-                        value={facultyId}
-                        onChange={(e) => setFacultyId(e.target.value)}
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="department">Department</Label>
-                    <Select value={department} onValueChange={setDepartment} required>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select department" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {departments.map((dept) => (
-                          <SelectItem key={dept.id} value={dept.name}>
-                            {dept.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="hospital">Hospital</Label>
-                    <div className="relative">
-                      <Building className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Select value={hospital} onValueChange={setHospital} required>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select hospital" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {hospitals.map((h) => (
-                            <SelectItem key={h.id} value={h.name}>
-                              {h.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </>
-              )}
+              <div className="space-y-2">
+                <Label htmlFor="hospital">Hospital</Label>
+                <div className="relative">
+                  <Building className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Select value={hospital} onValueChange={setHospital} required>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select hospital" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {hospitals.map((h) => (
+                        <SelectItem key={h.id} value={h.name}>
+                          {h.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
 
               <p className="text-xs text-muted-foreground">
                 Note: Faculty accounts require admin approval before activation.

@@ -21,8 +21,8 @@ import {
   AlertCircle,
 } from "lucide-react"
 import { FacultyDashboardHeader } from "@/components/faculty-dashboard-header"
-import { QRCodeDisplay } from "@/components/faculty/QRCodeDisplay"
-import { ManualAttendance } from "@/components/faculty/ManualAttendance"
+import { QRCodeDisplay } from "@/frontend/src/components/faculty/QRCodeDisplay"
+import { ManualAttendance } from "@/frontend/src/components/faculty/ManualAttendance"
 import { getAuth, onAuthStateChanged } from "firebase/auth"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { sessionService, attendanceService } from "@/services/api"
