@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/dialog"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { getAuth, onAuthStateChanged } from "firebase/auth"
-import { hospitalService } from "@/frontend/src/services/api"
+import { hospitalService } from "@/services/api"
 import { AlertCircle } from "lucide-react"
 
 export default function AdminHospitalsPage() {

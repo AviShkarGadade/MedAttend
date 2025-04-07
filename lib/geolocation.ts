@@ -1,4 +1,6 @@
-import opencage from 'opencage-api-client'
+import  opencage  from "opencage-api-client"
+
+// Initialize OpenCage with API key
 
 interface Coordinates {
   latitude: number

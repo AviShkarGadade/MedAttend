@@ -69,8 +69,8 @@ export default function Home() {
         <section className="bg-muted rounded-lg p-8 text-center">
           <h2 className="text-2xl font-bold mb-4">Ready to get started?</h2>
           <div className="flex justify-center gap-4">
-            <Link href="/login">
-              <Button size="lg">Sign In Now</Button>
+            <Link href="/register">
+              <Button size="lg">Sign Up Now</Button>
             </Link>
             <Link href="/about">
               <Button variant="outline" size="lg">

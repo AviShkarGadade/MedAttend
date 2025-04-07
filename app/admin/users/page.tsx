@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Search, Download, Plus, Trash2, Edit, Filter, UserPlus } from "lucide-react"
 import { AdminDashboardHeader } from "@/components/admin-dashboard-header"
@@ -21,7 +21,6 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { getAuth, onAuthStateChanged } from "firebase/auth"
 import { AlertCircle } from "lucide-react"
-import { departmentService, userService } from "@/frontend/src/services/api"
 
 export default function AdminUsersPage() {
   const [user, setUser] = useState<any>(null)
@@ -47,20 +46,50 @@ export default function AdminUsersPage() {
         setUser(user)
 
         try {
+          // Get token from localStorage
+          const token = localStorage.getItem("authToken")
+          if (!token) {
+            throw new Error("No authentication token found")
+          }
+
           // Fetch departments for filtering
-          const deptResponse = await departmentService.getDepartments()
-          setDepartments(deptResponse.data)
+          const deptResponse = await fetch("/api/departments", {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          })
+
+          if (deptResponse.ok) {
+            const deptData = await deptResponse.json()
+            setDepartments(deptData.data || [])
+          }
 
           // Fetch students
-          const studentsResponse = await userService.getUsers({ role: "student" })
-          setStudents(studentsResponse.data)
+          const studentsResponse = await fetch("/api/users?role=student", {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          })
+
+          if (studentsResponse.ok) {
+            const studentsData = await studentsResponse.json()
+            setStudents(studentsData.data || [])
+          }
 
           // Fetch faculty
-          const facultyResponse = await userService.getUsers({ role: "faculty" })
-          setFaculty(facultyResponse.data)
-        } catch (error) {
+          const facultyResponse = await fetch("/api/users?role=faculty", {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          })
+
+          if (facultyResponse.ok) {
+            const facultyData = await facultyResponse.json()
+            setFaculty(facultyData.data || [])
+          }
+        } catch (error: any) {
           console.error("Error fetching users:", error)
-          setError("Failed to load users")
+          setError(error.message || "Failed to load users")
         } finally {
           setLoading(false)
         }
@@ -77,7 +106,7 @@ export default function AdminUsersPage() {
   const filteredStudents = students.filter((student) => {
     const matchesSearch =
       student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      student.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (student.email && student.email.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (student.studentId && student.studentId.toLowerCase().includes(searchQuery.toLowerCase()))
 
     const matchesDepartment =
@@ -91,7 +120,7 @@ export default function AdminUsersPage() {
   const filteredFaculty = faculty.filter((faculty) => {
     const matchesSearch =
       faculty.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      faculty.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (faculty.email && faculty.email.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (faculty.facultyId && faculty.facultyId.toLowerCase().includes(searchQuery.toLowerCase()))
 
     const matchesDepartment =
@@ -104,7 +133,22 @@ export default function AdminUsersPage() {
     if (!selectedUser) return
 
     try {
-      await userService.deleteUser(selectedUser._id)
+      // Get token from localStorage
+      const token = localStorage.getItem("authToken")
+      if (!token) {
+        throw new Error("No authentication token found")
+      }
+
+      const response = await fetch(`/api/users/${selectedUser._id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to delete user: ${response.status}`)
+      }
 
       // Update lists
       if (selectedUser.role === "student") {
@@ -215,7 +259,7 @@ export default function AdminUsersPage() {
               </div>
             </div>
 
-            <TabsContent value="students" className="mt-0">
+            {activeTab === "students" && (
               <div className="border rounded-lg overflow-hidden">
                 <div className="grid grid-cols-12 gap-4 p-4 bg-muted font-medium">
                   <div className="col-span-3">Name</div>
@@ -269,9 +313,9 @@ export default function AdminUsersPage() {
                   <div className="p-8 text-center text-muted-foreground">No students found matching your filters</div>
                 )}
               </div>
-            </TabsContent>
+            )}
 
-            <TabsContent value="faculty" className="mt-0">
+            {activeTab === "faculty" && (
               <div className="border rounded-lg overflow-hidden">
                 <div className="grid grid-cols-12 gap-4 p-4 bg-muted font-medium">
                   <div className="col-span-3">Name</div>
@@ -325,7 +369,7 @@ export default function AdminUsersPage() {
                   <div className="p-8 text-center text-muted-foreground">No faculty found matching your filters</div>
                 )}
               </div>
-            </TabsContent>
+            )}
           </CardContent>
           <CardFooter className="flex justify-between">
             <Button variant="outline" size="sm">
