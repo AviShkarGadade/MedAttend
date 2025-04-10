@@ -12,15 +12,13 @@ router.get("/dashboard", protect, authorize("faculty"), async (req, res) => {
   try {
     const faculty = req.user
 
-    // Get active sessions for today
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const tomorrow = new Date(today)
-    tomorrow.setDate(tomorrow.getDate() + 1)
+    // Get today's date in ISO format (YYYY-MM-DD)
+    const today = new Date().toISOString().split("T")[0]
 
+    // Get active sessions for today
     const activeSessions = await Session.find({
       faculty: faculty._id,
-      date: { $gte: today, $lt: tomorrow },
+      date: { $gte: today, $lte: today },
       status: "active",
     })
       .populate("department", "name")
@@ -29,7 +27,7 @@ router.get("/dashboard", protect, authorize("faculty"), async (req, res) => {
     // Get upcoming sessions
     const upcomingSessions = await Session.find({
       faculty: faculty._id,
-      date: { $gt: tomorrow },
+      date: { $gt: today },
       status: "upcoming",
     })
       .populate("department", "name")
@@ -177,4 +175,3 @@ router.get("/test", (req, res) => {
 })
 
 module.exports = router
-

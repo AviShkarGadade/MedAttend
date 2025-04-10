@@ -79,4 +79,3 @@ export const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onScan }) => {
     </div>
   )
 }
-

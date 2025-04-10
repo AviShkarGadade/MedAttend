@@ -114,9 +114,15 @@ exports.createSession = async (req, res) => {
 
     await Notification.insertMany(notifications)
 
+    // Populate the session object before sending the response
+    const populatedSession = await Session.findById(session._id)
+      .populate("faculty", "name")
+      .populate("department", "name")
+      .populate("hospital", "name")
+
     res.status(201).json({
       success: true,
-      data: session,
+      data: populatedSession,
     })
   } catch (error) {
     console.error("Create session error:", error)
@@ -497,4 +503,3 @@ exports.completeSession = async (req, res) => {
     })
   }
 }
-

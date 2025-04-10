@@ -1,6 +1,5 @@
 "use client"
 
-import type React from "react"
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { useAuth } from "../../contexts/AuthContext"
@@ -9,71 +8,84 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
   Button,
   Badge,
-  Input,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Alert,
+  AlertDescription,
 } from "../../components/ui"
 import { FacultyDashboardHeader } from "../../components/faculty/FacultyDashboardHeader"
 import { QRCodeDisplay } from "../../components/faculty/QRCodeDisplay"
-import { CalendarIcon, Clock, MapPin, Users, QrCode, BarChart3, Plus, Search, Download } from "lucide-react"
+import { CalendarIcon, Clock, MapPin, Users, QrCode, BarChart3, Plus, RefreshCw, AlertCircle } from "lucide-react"
 
-const FacultyDashboard: React.FC = () => {
+const FacultyDashboard = () => {
   const { currentUser } = useAuth()
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [currentSessions, setCurrentSessions] = useState<any[]>([])
-  const [upcomingSessions, setUpcomingSessions] = useState<any[]>([])
-  const [students, setStudents] = useState<any[]>([])
+  const [error, setError] = useState(null)
+  const [currentSessions, setCurrentSessions] = useState([])
+  const [upcomingSessions, setUpcomingSessions] = useState([])
+  const [students, setStudents] = useState([])
   const [showQRCode, setShowQRCode] = useState(false)
-  const [selectedSession, setSelectedSession] = useState<any>(null)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [yearFilter, setYearFilter] = useState("all")
+  const [selectedSession, setSelectedSession] = useState(null)
+  const [refreshing, setRefreshing] = useState(false)
   const navigate = useNavigate()
 
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        setLoading(true)
+  // Function to fetch dashboard data
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true)
+      setError(null)
 
-        // Fetch active sessions
-        const activeSessions = await sessionService.getSessions({
-          status: "active",
-        })
-        setCurrentSessions(activeSessions.data)
+      // Get today's date in ISO format (YYYY-MM-DD)
+      const today = new Date().toISOString().split("T")[0]
+      console.log("Fetching sessions for today:", today)
 
-        // Fetch upcoming sessions
-        const upcomingSessions = await sessionService.getSessions({
-          status: "upcoming",
-          limit: 5,
-        })
-        setUpcomingSessions(upcomingSessions.data)
+      // Fetch active sessions for today
+      const activeSessions = await sessionService.getSessions({
+        status: "active",
+        date: today,
+      })
 
-        // Fetch students in faculty's department
-        const studentsResponse = await userService.getUsers({
-          role: "student",
-          department: currentUser.department,
-        })
-        setStudents(studentsResponse.data)
-      } catch (err: any) {
-        console.error("Error fetching dashboard data:", err)
-        setError("Failed to load dashboard data")
-      } finally {
-        setLoading(false)
-      }
+      // Fetch upcoming sessions
+      const upcomingSessions = await sessionService.getSessions({
+        status: "upcoming",
+        limit: 5,
+      })
+
+      // Fetch students in faculty's department
+      const studentsResponse = await userService.getUsers({
+        role: "student",
+        department: currentUser.department,
+      })
+
+      console.log("Active sessions:", activeSessions.data)
+      console.log("Upcoming sessions:", upcomingSessions.data)
+
+      setCurrentSessions(activeSessions.data || [])
+      setUpcomingSessions(upcomingSessions.data || [])
+      setStudents(studentsResponse.data || [])
+    } catch (err) {
+      console.error("Error fetching dashboard data:", err)
+      setError("Failed to load dashboard data. " + (err.message || "Please try again."))
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
     }
+  }
 
+  // Initial data fetch
+  useEffect(() => {
     fetchDashboardData()
   }, [currentUser])
 
-  const handleGenerateQRCode = async (session: any) => {
+  // Handle manual refresh
+  const handleRefresh = () => {
+    setRefreshing(true)
+    fetchDashboardData()
+  }
+
+  const handleGenerateQRCode = async (session) => {
     try {
       const response = await sessionService.generateQRCode(session._id)
       setSelectedSession({
@@ -82,34 +94,19 @@ const FacultyDashboard: React.FC = () => {
         qrCodeExpiry: response.data.expiry,
       })
       setShowQRCode(true)
-    } catch (err: any) {
+    } catch (err) {
       console.error("Error generating QR code:", err)
-      setError("Failed to generate QR code")
+      setError("Failed to generate QR code: " + (err.message || "Please try again."))
     }
   }
 
-  const filteredStudents = students.filter((student) => {
-    const matchesSearch =
-      student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      student.studentId.toLowerCase().includes(searchQuery.toLowerCase())
-
-    const matchesYear = yearFilter === "all" || student.year.toString() === yearFilter
-
-    return matchesSearch && matchesYear
-  })
-
-  const getAttendanceRateBadge = (rate: number) => {
-    if (rate >= 90) {
-      return <Badge className="bg-green-500">{rate}%</Badge>
-    } else if (rate >= 75) {
-      return <Badge className="bg-yellow-500">{rate}%</Badge>
-    } else {
-      return <Badge className="bg-red-500">{rate}%</Badge>
-    }
-  }
-
-  if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>
+  if (loading && !refreshing) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <RefreshCw className="h-6 w-6 animate-spin mr-2" />
+        <span>Loading dashboard...</span>
+      </div>
+    )
   }
 
   return (
@@ -117,6 +114,13 @@ const FacultyDashboard: React.FC = () => {
       <FacultyDashboardHeader user={currentUser} />
 
       <main className="container mx-auto px-4 py-6">
+        {error && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
           <div>
             <h1 className="text-2xl font-bold">Faculty Dashboard</h1>
@@ -130,6 +134,10 @@ const FacultyDashboard: React.FC = () => {
             <Button variant="outline" onClick={() => navigate("/faculty/reports")}>
               <BarChart3 className="h-4 w-4 mr-2" />
               Reports
+            </Button>
+            <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
+              Refresh
             </Button>
           </div>
         </div>
@@ -180,7 +188,15 @@ const FacultyDashboard: React.FC = () => {
                     </div>
                   ))
                 ) : (
-                  <div className="text-center py-6 text-muted-foreground">No active sessions for today</div>
+                  <div className="text-center py-6 text-muted-foreground">
+                    No active sessions for today
+                    <div className="mt-2">
+                      <Button variant="outline" size="sm" onClick={() => navigate("/faculty/create-session")}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Create Session
+                      </Button>
+                    </div>
+                  </div>
                 )}
               </div>
             </CardContent>
@@ -246,88 +262,19 @@ const FacultyDashboard: React.FC = () => {
             </CardContent>
           </Card>
         </div>
-
-        <div className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Student Management</CardTitle>
-              <CardDescription>View and manage students under your supervision</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col md:flex-row gap-4 mb-4">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search students..."
-                    className="pl-10"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                </div>
-                <Select value={yearFilter} onValueChange={setYearFilter}>
-                  <SelectTrigger className="w-full md:w-[180px]">
-                    <SelectValue placeholder="Filter by year" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Years</SelectItem>
-                    <SelectItem value="3">Year 3</SelectItem>
-                    <SelectItem value="4">Year 4</SelectItem>
-                    <SelectItem value="5">Year 5</SelectItem>
-                    <SelectItem value="6">Year 6</SelectItem>
-                    <SelectItem value="7">Year 7</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button variant="outline" className="flex gap-2">
-                  <Download className="h-4 w-4" />
-                  Export
-                </Button>
-              </div>
-
-              <div className="border rounded-lg overflow-hidden">
-                <div className="grid grid-cols-12 gap-4 p-4 bg-muted font-medium">
-                  <div className="col-span-5">Name</div>
-                  <div className="col-span-3">Department</div>
-                  <div className="col-span-2">Year</div>
-                  <div className="col-span-2">Attendance</div>
-                </div>
-
-                {filteredStudents.length > 0 ? (
-                  filteredStudents.map((student) => (
-                    <div key={student._id} className="grid grid-cols-12 gap-4 p-4 border-t">
-                      <div className="col-span-5 font-medium">{student.name}</div>
-                      <div className="col-span-3 text-muted-foreground">{student.department.name}</div>
-                      <div className="col-span-2 text-muted-foreground">Year {student.year}</div>
-                      <div className="col-span-2">{getAttendanceRateBadge(student.attendanceRate || 0)}</div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="p-4 text-center text-muted-foreground">No students found</div>
-                )}
-              </div>
-            </CardContent>
-            <CardFooter className="flex justify-between">
-              <Button variant="outline" size="sm">
-                Previous
-              </Button>
-              <Button variant="outline" size="sm">
-                Next
-              </Button>
-            </CardFooter>
-          </Card>
-        </div>
-
-        {/* QR Code Modal */}
-        {showQRCode && selectedSession && (
-          <QRCodeDisplay
-            session={selectedSession}
-            onClose={() => {
-              setShowQRCode(false)
-              setSelectedSession(null)
-            }}
-            onRefresh={() => handleGenerateQRCode(selectedSession)}
-          />
-        )}
       </main>
+
+      {/* QR Code Modal */}
+      {showQRCode && selectedSession && (
+        <QRCodeDisplay
+          session={selectedSession}
+          onClose={() => {
+            setShowQRCode(false)
+            setSelectedSession(null)
+          }}
+          onRefresh={() => handleGenerateQRCode(selectedSession)}
+        />
+      )}
     </div>
   )
 }

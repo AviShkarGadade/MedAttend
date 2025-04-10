@@ -1,18 +1,41 @@
-const mongoose = require("mongoose")
+const mongoose = require('mongoose');
+const logger = require('../utils/logger');
 
 const connectDB = async () => {
   try {
+    // Add retry logic and connection options
     const conn = await mongoose.connect(process.env.MONGODB_URI, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
-    })
+      serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
+      retryWrites: true,
+      retryReads: true,
+      maxPoolSize: 10, // Maintain up to 10 socket connections
+    });
 
-    console.log(`MongoDB Connected: ${conn.connection.host}`)
+    logger.info(`MongoDB Connected: ${conn.connection.host}`);
+    return conn;
   } catch (error) {
-    console.error(`Error connecting to MongoDB: ${error.message}`)
-    process.exit(1)
+    logger.error(`Error connecting to MongoDB: ${error.message}`);
+    // Provide more detailed error information
+    if (error.name === 'MongoServerSelectionError') {
+      logger.error(`Could not connect to any MongoDB servers: ${error.message}`);
+      logger.error(`Please check your MongoDB URI and network connectivity`);
+    }
+    
+    // Don't exit the process, allow for graceful handling
+    throw error;
   }
-}
+};
 
-module.exports = connectDB
+// Add a connection event listener for when disconnected
+mongoose.connection.on('disconnected', () => {
+  logger.warn('MongoDB disconnected. Attempting to reconnect...');
+});
 
+// Add a connection event listener for errors
+mongoose.connection.on('error', (err) => {
+  logger.error(`MongoDB connection error: ${err.message}`);
+});
+
+module.exports = connectDB;

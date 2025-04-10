@@ -85,4 +85,3 @@ export const getIdToken = async (user: FirebaseUser): Promise<string> => {
 }
 
 export { auth, app }
-

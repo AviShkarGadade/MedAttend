@@ -25,7 +25,7 @@ export default function Home() {
 
       <main className="flex-1 container mx-auto px-4 py-8">
         <section className="mb-12 text-center">
-          <h1 className="text-4xl font-bold mb-4">Medical Students Attendance Management</h1>
+          <h1 className="text-4xl font-bold mb-4">Medical Rotation Attendance Management</h1>
           <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
             Streamline attendance tracking for medical interns across multiple hospital rotations with geolocation and
             QR code verification.
@@ -89,4 +89,3 @@ export default function Home() {
     </div>
   )
 }
-

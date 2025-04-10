@@ -39,7 +39,7 @@ export default function AdminDashboard() {
         })
 
         // Fetch recent sessions
-        const sessionsResponse = await fetch("/api/sessions?limit=5", {
+        const sessionsResponse = await fetch("/api/sessions?limit=10", {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -70,6 +70,8 @@ export default function AdminDashboard() {
         if (sessionsResponse.ok) {
           const sessionsResult = await sessionsResponse.json()
           sessionsData = sessionsResult.data || []
+        } else {
+          console.error(`Sessions API error: ${sessionsResponse.status}`)
         }
 
         setAdminData(adminData)
@@ -104,6 +106,10 @@ export default function AdminDashboard() {
 
   const handleRetry = () => {
     setApiRetries((prev) => prev + 1)
+  }
+
+  const handleViewSessionDetails = (sessionId: string) => {
+    router.push(`/admin/sessions/${sessionId}`)
   }
 
   if (loading) {
@@ -252,15 +258,18 @@ export default function AdminDashboard() {
                           </div>
                         </div>
                         <div>
-                          <p className="text-sm text-muted-foreground">
+                          <p className="text-sm text-muted-foreground mb-2">
                             Created by: {session.faculty?.name || "Unknown Faculty"}
                           </p>
+                          <Button size="sm" onClick={() => handleViewSessionDetails(session._id)}>
+                            View Details
+                          </Button>
                         </div>
                       </div>
                     </div>
                   ))
                 ) : (
-                  <div className="text-center py-6 text-muted-foreground">No sessions found</div>
+                  <div className="text-center py-8 text-muted-foreground">No sessions found</div>
                 )}
               </div>
             </CardContent>
@@ -270,4 +279,3 @@ export default function AdminDashboard() {
     </ProtectedRoute>
   )
 }
-

@@ -83,4 +83,3 @@ export async function generateQRCode(sessionId: string, expiryMinutes = 10): Pro
     throw error
   }
 }
-

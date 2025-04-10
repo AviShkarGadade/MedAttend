@@ -7,9 +7,9 @@ import { AuthProvider } from "@/components/auth-provider"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "MedAttend - Medical Students Attendance Management",
+  title: "MedAttend - Medical Rotation Attendance Management",
   description: "Streamline attendance tracking for medical interns across multiple hospital rotations",
-    
+    generator: 'v0.dev'
 }
 
 export default function RootLayout({
@@ -25,7 +25,6 @@ export default function RootLayout({
     </html>
   )
 }
-
 
 
 import './globals.css'

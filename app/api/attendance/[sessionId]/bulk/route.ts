@@ -41,7 +41,14 @@ export async function POST(request: NextRequest, { params }: { params: { session
     }
 
     // Get session
-    const session = await db.collection("sessions").findOne({ _id: new ObjectId(sessionId) })
+    let sessionObjectId
+    try {
+      sessionObjectId = new ObjectId(sessionId)
+    } catch (error) {
+      return NextResponse.json({ message: "Invalid session ID format" }, { status: 400 })
+    }
+
+    const session = await db.collection("sessions").findOne({ _id: sessionObjectId })
     if (!session) {
       return NextResponse.json({ message: "Session not found" }, { status: 404 })
     }
@@ -69,8 +76,19 @@ export async function POST(request: NextRequest, { params }: { params: { session
           const { studentId, status, notes } = record
 
           // Validate student
+          let studentObjectId
+          try {
+            studentObjectId = new ObjectId(studentId)
+          } catch (error) {
+            return {
+              studentId,
+              success: false,
+              message: "Invalid student ID format",
+            }
+          }
+
           const student = await db.collection("users").findOne({
-            _id: new ObjectId(studentId),
+            _id: studentObjectId,
             role: "student",
           })
 
@@ -83,15 +101,15 @@ export async function POST(request: NextRequest, { params }: { params: { session
           }
 
           // Check if attendance already exists
-          const existingAttendance = await db.collection("attendance").findOne({
-            session: new ObjectId(sessionId),
-            student: new ObjectId(studentId),
+          const attendance = await db.collection("attendance").findOne({
+            session: sessionObjectId,
+            student: studentObjectId,
           })
 
-          if (existingAttendance) {
+          if (attendance) {
             // Update existing attendance
             await db.collection("attendance").updateOne(
-              { _id: existingAttendance._id },
+              { _id: attendance._id },
               {
                 $set: {
                   status,
@@ -111,8 +129,8 @@ export async function POST(request: NextRequest, { params }: { params: { session
           } else {
             // Create new attendance record
             const newAttendance = {
-              session: new ObjectId(sessionId),
-              student: new ObjectId(studentId),
+              session: sessionObjectId,
+              student: studentObjectId,
               status,
               notes,
               verifiedBy: user._id,
@@ -150,4 +168,3 @@ export async function POST(request: NextRequest, { params }: { params: { session
     return NextResponse.json({ message: error.message || "Server error" }, { status: 500 })
   }
 }
-

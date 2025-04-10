@@ -81,4 +81,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: error.message || "Registration failed" }, { status: 400 })
   }
 }
-

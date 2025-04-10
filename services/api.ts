@@ -264,4 +264,3 @@ export const attendanceService = {
     return handleResponse(response)
   },
 }
-

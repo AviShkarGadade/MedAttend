@@ -62,4 +62,3 @@ export const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({ session, onClose, 
     </div>
   )
 }
-

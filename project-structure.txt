@@ -26,4 +26,3 @@ medical-attendance/
 ├── .gitignore
 ├── package.json
 └── README.md
-

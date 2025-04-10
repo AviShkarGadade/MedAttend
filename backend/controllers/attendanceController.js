@@ -186,9 +186,21 @@ exports.markAttendance = async (req, res) => {
       },
     })
 
+    // Populate the attendance object before sending the response
+    const populatedAttendance = await Attendance.findById(attendance._id)
+      .populate({
+        path: "session",
+        select: "title date startTime endTime location department hospital",
+        populate: [
+          { path: "department", select: "name" },
+          { path: "hospital", select: "name" },
+        ],
+      })
+      .populate("student", "name studentId")
+
     res.status(201).json({
       success: true,
-      data: attendance,
+      data: populatedAttendance,
       message: `Attendance marked as ${status}`,
     })
   } catch (error) {
@@ -723,12 +735,13 @@ exports.generateAttendanceReport = async (req, res) => {
     // Format response based on requested format
     if (format === "csv") {
       // Generate CSV report
-      let csv = "Student ID,Student Name,Present,Late,Absent,Excused,Attendance %\n"
+      let csv = "Student ID,Student Name,Present,Late,Absent,Excused,Attendance % \n"
 
       Object.values(studentAttendance).forEach((record) => {
         const attendancePercentage = ((record.stats.present + record.stats.late) / record.stats.total) * 100
 
-        csv += `${record.student.studentId},${record.student.name},${record.stats.present},${record.stats.late},${record.stats.absent},${record.stats.excused},${attendancePercentage.toFixed(2)}%\n`
+        csv += `${record.student.studentId},${record.student.name},${record.stats.present},${record.stats.late},${record.stats.absent},${record.stats.excused},${attendancePercentage.toFixed(2)}%
+`
       })
 
       res.setHeader("Content-Type", "text/csv")
@@ -753,4 +766,3 @@ exports.generateAttendanceReport = async (req, res) => {
     })
   }
 }
-

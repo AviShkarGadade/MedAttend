@@ -1,6 +1,7 @@
-import  opencage  from "opencage-api-client"
+import { OpenCage } from "opencage-api-client"
 
 // Initialize OpenCage with API key
+const opencage = new OpenCage({ key: process.env.OPENCAGE_API_KEY || "" })
 
 interface Coordinates {
   latitude: number
@@ -70,4 +71,3 @@ export function isWithinRadius(userCoords: Coordinates, locationCoords: Coordina
   const distance = calculateDistance(userCoords, locationCoords)
   return distance <= radiusInMeters
 }
-

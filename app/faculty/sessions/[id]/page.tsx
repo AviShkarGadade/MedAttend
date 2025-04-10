@@ -40,22 +40,29 @@ export default function SessionDetailPage() {
   const [attendanceStatus, setAttendanceStatus] = useState<Record<string, string>>({})
   const [notes, setNotes] = useState<Record<string, string>>({})
   const [activeTab, setActiveTab] = useState("attendance")
+  const [attendanceTaken, setAttendanceTaken] = useState(false)
 
   const router = useRouter()
   const params = useParams()
   const { user } = useAuth()
-  const sessionId = params.id as string
+  const sessionId = params?.id as string
 
   useEffect(() => {
     const fetchSessionData = async () => {
       try {
         setLoading(true)
 
+        if (!sessionId) {
+          throw new Error("Session ID is missing")
+        }
+
         // Get token from localStorage
         const token = localStorage.getItem("authToken")
         if (!token) {
           throw new Error("No authentication token found")
         }
+
+        console.log("Fetching session with ID:", sessionId)
 
         // Fetch session details
         const sessionResponse = await fetch(`/api/sessions/${sessionId}`, {
@@ -65,27 +72,13 @@ export default function SessionDetailPage() {
         })
 
         if (!sessionResponse.ok) {
-          throw new Error(`Failed to fetch session: ${sessionResponse.status}`)
+          const errorText = await sessionResponse.text()
+          throw new Error(`Failed to fetch session: ${sessionResponse.status} - ${errorText}`)
         }
 
         const sessionData = await sessionResponse.json()
+        console.log("Session data:", sessionData)
         setSession(sessionData.data)
-
-        // Fetch students in the department and year
-        const studentsResponse = await fetch(
-          `/api/users?role=student&department=${sessionData.data.department._id}&year=${sessionData.data.year}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          },
-        )
-
-        if (!studentsResponse.ok) {
-          throw new Error(`Failed to fetch students: ${studentsResponse.status}`)
-        }
-
-        const studentsData = await studentsResponse.json()
 
         // Fetch attendance records
         const attendanceResponse = await fetch(`/api/sessions/${sessionId}/attendance`, {
@@ -94,50 +87,36 @@ export default function SessionDetailPage() {
           },
         })
 
-        let attendanceData: any[] = []
+        if (!attendanceResponse.ok) {
+          const errorText = await attendanceResponse.text()
+          console.error("Failed to fetch attendance records:", errorText)
+          setAttendanceRecords([])
+        } else {
+          const attendanceData = await attendanceResponse.json()
+          console.log("Attendance data:", attendanceData)
+          setAttendanceRecords(attendanceData.data || [])
 
-        if (attendanceResponse.ok) {
-          const attendanceResult = await attendanceResponse.json()
-          attendanceData = attendanceResult.data || []
-        }
-
-        // Create attendance records for all students
-        const records = studentsData.data.map((student: any) => {
-          // Find existing attendance record
-          const existingRecord = attendanceData.find(
-            (record: any) => record.student && record.student._id === student._id,
+          // Check if attendance has been taken
+          const hasAttendance = attendanceData.data.some(
+            (record: any) => record._id !== null && (record.status === "present" || record.status === "late"),
           )
+          setAttendanceTaken(hasAttendance)
 
-          if (existingRecord) {
-            return existingRecord
-          } else {
-            // Create a new record if none exists
-            return {
-              student: student,
-              status: "absent",
-              notes: "",
-              checkInTime: null,
-              checkOutTime: null,
-            }
-          }
-        })
+          // Initialize selected state and status for all students
+          const initialSelected: Record<string, boolean> = {}
+          const initialStatus: Record<string, string> = {}
+          const initialNotes: Record<string, string> = {}
 
-        setAttendanceRecords(records)
+          attendanceData.data.forEach((record: any) => {
+            initialSelected[record.student._id] = false
+            initialStatus[record.student._id] = record.status || "absent"
+            initialNotes[record.student._id] = record.notes || ""
+          })
 
-        // Initialize selected state and status for all students
-        const initialSelected: Record<string, boolean> = {}
-        const initialStatus: Record<string, string> = {}
-        const initialNotes: Record<string, string> = {}
-
-        records.forEach((record: any) => {
-          initialSelected[record.student._id] = false
-          initialStatus[record.student._id] = record.status || "absent"
-          initialNotes[record.student._id] = record.notes || ""
-        })
-
-        setSelectedStudents(initialSelected)
-        setAttendanceStatus(initialStatus)
-        setNotes(initialNotes)
+          setSelectedStudents(initialSelected)
+          setAttendanceStatus(initialStatus)
+          setNotes(initialNotes)
+        }
       } catch (error: any) {
         console.error("Error fetching session data:", error)
         setError(error.message || "Failed to load session data")
@@ -203,9 +182,11 @@ export default function SessionDetailPage() {
       // Prepare attendance records
       const attendanceRecords = selectedStudentIds.map((studentId) => ({
         studentId,
-        status: attendanceStatus[studentId],
-        notes: notes[studentId],
+        status: attendanceStatus[studentId] || "absent",
+        notes: notes[studentId] || "",
       }))
+
+      console.log("Submitting attendance records:", attendanceRecords)
 
       // Submit bulk attendance
       const response = await fetch(`/api/attendance/${sessionId}/bulk`, {
@@ -218,8 +199,12 @@ export default function SessionDetailPage() {
       })
 
       if (!response.ok) {
-        throw new Error(`Failed to save attendance: ${response.status}`)
+        const errorData = await response.json()
+        throw new Error(errorData.message || "Failed to save attendance")
       }
+
+      const responseData = await response.json()
+      console.log("Attendance response:", responseData)
 
       // Refresh attendance records
       const attendanceResponse = await fetch(`/api/sessions/${sessionId}/attendance`, {
@@ -230,18 +215,13 @@ export default function SessionDetailPage() {
 
       if (attendanceResponse.ok) {
         const attendanceResult = await attendanceResponse.json()
+        setAttendanceRecords(attendanceResult.data || [])
 
-        // Update attendance records
-        const updatedRecords = [...attendanceRecords]
-
-        attendanceResult.data.forEach((record: any) => {
-          const index = updatedRecords.findIndex((r) => r.studentId === record.student._id)
-          if (index !== -1) {
-            updatedRecords[index] = record
-          }
-        })
-
-        setAttendanceRecords(updatedRecords)
+        // Check if attendance has been taken
+        const hasAttendance = attendanceResult.data.some(
+          (record: any) => record._id !== null && (record.status === "present" || record.status === "late"),
+        )
+        setAttendanceTaken(hasAttendance)
       }
 
       setSuccess("Attendance saved successfully")
@@ -304,11 +284,23 @@ export default function SessionDetailPage() {
   }
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <RefreshCw className="h-6 w-6 animate-spin mr-2" />
+        Loading...
+      </div>
+    )
   }
 
   if (!session) {
-    return <div className="flex items-center justify-center min-h-screen">Session not found</div>
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Alert variant="destructive" className="max-w-md">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>Session not found or error loading session data</AlertDescription>
+        </Alert>
+      </div>
+    )
   }
 
   return (
@@ -358,6 +350,12 @@ export default function SessionDetailPage() {
                 >
                   {session.status.charAt(0).toUpperCase() + session.status.slice(1)}
                 </Badge>
+                {attendanceTaken && (
+                  <Badge className="bg-green-500">
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    Attendance Taken
+                  </Badge>
+                )}
               </div>
             </div>
 
@@ -460,7 +458,7 @@ export default function SessionDetailPage() {
                           <div className="col-span-2 flex items-center">{record.student.studentId}</div>
                           <div className="col-span-3">
                             <Select
-                              value={attendanceStatus[record.student._id]}
+                              value={attendanceStatus[record.student._id] || record.status}
                               onValueChange={(value) => handleStatusChange(record.student._id, value)}
                             >
                               <SelectTrigger>
@@ -497,7 +495,7 @@ export default function SessionDetailPage() {
                           <div className="col-span-3">
                             <Input
                               placeholder="Add notes (optional)"
-                              value={notes[record.student._id] || ""}
+                              value={notes[record.student._id] || record.notes || ""}
                               onChange={(e) => handleNotesChange(record.student._id, e.target.value)}
                             />
                           </div>
@@ -601,4 +599,3 @@ export default function SessionDetailPage() {
     </ProtectedRoute>
   )
 }
-

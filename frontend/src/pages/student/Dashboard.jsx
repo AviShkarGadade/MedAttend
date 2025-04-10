@@ -1,14 +1,31 @@
 "use client"
 
+import { CardFooter } from "@/components/ui/card"
+
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Calendar } from "@/components/ui/calendar"
-import { Progress } from "@/components/ui/progress"
-import { Badge } from "@/components/ui/badge"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useNavigate } from "react-router-dom"
+import { useAuth } from "../../contexts/AuthContext"
+import { sessionService, attendanceService } from "../../services/api"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  Button,
+  Progress,
+  Badge,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+  Calendar,
+  Alert,
+  AlertDescription,
+} from "../../components/ui"
+import { StudentDashboardHeader } from "../../components/student/StudentDashboardHeader"
+import { QRCodeScanner } from "../../components/student/QRCodeScanner"
+import { GeolocationAttendance } from "../../components/student/GeolocationAttendance"
 import {
   CalendarIcon,
   Clock,
@@ -20,258 +37,217 @@ import {
   AlertCircle,
   RefreshCw,
 } from "lucide-react"
-import { StudentDashboardHeader } from "@/components/student-dashboard-header"
-import { useAuth } from "@/components/auth-provider"
-import { DashboardFallback } from "@/components/dashboard-fallback"
 
-export default function StudentDashboard() {
-  const [date, setDate] = useState<Date | undefined>(new Date())
+const StudentDashboard = () => {
+  const { currentUser } = useAuth()
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [upcomingSessions, setUpcomingSessions] = useState<any[]>([])
-  const [recentAttendance, setRecentAttendance] = useState<any[]>([])
-  const [attendanceStats, setAttendanceStats] = useState<any>(null)
-  const [currentRotation, setCurrentRotation] = useState<any>(null)
+  const [error, setError] = useState(null)
+  const [upcomingSessions, setUpcomingSessions] = useState([])
+  const [recentAttendance, setRecentAttendance] = useState([])
+  const [attendanceStats, setAttendanceStats] = useState(null)
+  const [currentRotation, setCurrentRotation] = useState(null)
   const [showScanner, setShowScanner] = useState(false)
+  const [showGeolocation, setShowGeolocation] = useState(false)
+  const [selectedSession, setSelectedSession] = useState(null)
+  const [date, setDate] = useState(new Date())
   const [activeTab, setActiveTab] = useState("upcoming")
-  const [apiRetries, setApiRetries] = useState(0)
+  const [refreshing, setRefreshing] = useState(false)
+  const navigate = useNavigate()
 
-  const router = useRouter()
-  const { user } = useAuth()
+  // Function to fetch dashboard data
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true)
+      setError(null)
 
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        setLoading(true)
+      // Get today's date in ISO format (YYYY-MM-DD)
+      const today = new Date().toISOString().split("T")[0]
+      console.log("Fetching sessions for today:", today)
 
-        // Get token from localStorage
-        const token = localStorage.getItem("authToken")
-        if (!token) {
-          throw new Error("No authentication token found")
+      // Fetch active sessions for today
+      const activeSessions = await sessionService.getSessions({
+        status: "active",
+        date: today,
+      })
+
+      // Fetch upcoming sessions
+      const upcomingSessions = await sessionService.getSessions({
+        status: "upcoming",
+        limit: 5,
+      })
+
+      // Fetch recent attendance
+      const attendanceResponse = await attendanceService.getAttendanceHistory({
+        limit: 5,
+      })
+
+      // Fetch attendance stats
+      const statsResponse = await attendanceService.getAttendanceStats({})
+
+      console.log("Active sessions:", activeSessions.data)
+      console.log("Upcoming sessions:", upcomingSessions.data)
+      console.log("Recent attendance:", attendanceResponse.data)
+      console.log("Attendance stats:", statsResponse.data)
+
+      // Combine active and upcoming sessions
+      const allSessions = [...(activeSessions.data || []), ...(upcomingSessions.data || [])]
+
+      // Sort sessions by date and time
+      allSessions.sort((a, b) => {
+        const dateA = new Date(a.date)
+        const dateB = new Date(b.date)
+        if (dateA.getTime() !== dateB.getTime()) {
+          return dateA - dateB
         }
+        return a.startTime.localeCompare(b.startTime)
+      })
 
-        // Get today's date in ISO format (YYYY-MM-DD)
-        const today = new Date().toISOString().split("T")[0]
-        console.log("Today's date:", today)
+      setUpcomingSessions(allSessions)
+      setRecentAttendance(attendanceResponse.data || [])
+      setAttendanceStats(
+        statsResponse.data || {
+          present: 0,
+          absent: 0,
+          late: 0,
+          total: 0,
+          presentPercentage: 0,
+        },
+      )
 
-        // Fetch active sessions for today
-        const activeSessions = await fetch(`/api/sessions?status=active&date=${today}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        })
-
-        // Fetch upcoming sessions
-        const upcomingSessions = await fetch("/api/sessions?status=upcoming&limit=5", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        })
-
-        // Fetch recent attendance
-        const attendanceResponse = await fetch("/api/attendance/history?limit=5", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        })
-
-        let activeSessionsData = []
-        let upcomingSessionsData = []
-        let attendanceData = []
-
-        if (activeSessions.ok) {
-          const activeData = await activeSessions.json()
-          activeSessionsData = activeData.data || []
-          console.log("Active sessions:", activeSessionsData)
-        } else {
-          console.error("Failed to fetch active sessions:", await activeSessions.text())
-        }
-
-        if (upcomingSessions.ok) {
-          const upcomingData = await upcomingSessions.json()
-          upcomingSessionsData = upcomingData.data || []
-          console.log("Upcoming sessions:", upcomingSessionsData)
-        } else {
-          console.error("Failed to fetch upcoming sessions:", await upcomingSessions.text())
-        }
-
-        if (attendanceResponse.ok) {
-          const attendanceResult = await attendanceResponse.json()
-          attendanceData = attendanceResult.data || []
-          console.log("Attendance data:", attendanceData)
-        } else {
-          console.error("Failed to fetch attendance history:", await attendanceResponse.text())
-          // Use mock data as fallback
-          attendanceData = []
-        }
-
-        // Fetch attendance stats
-        const statsResponse = await fetch("/api/attendance/stats", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        })
-
-        let statsData = null
-        if (statsResponse.ok) {
-          const statsResult = await statsResponse.json()
-          statsData = statsResult.data
-          console.log("Attendance stats:", statsData)
-        } else {
-          console.error("Failed to fetch attendance stats:", await statsResponse.text())
-          // Use mock data as fallback
-          statsData = {
-            present: 0,
-            absent: 0,
-            late: 0,
-            total: 0,
-            presentPercentage: 0,
-            absentPercentage: 0,
-            latePercentage: 0,
-          }
-        }
-
-        // Set current rotation based on user data
-        const currentRotation = {
-          hospital: user.hospital || "City General Hospital",
-          department: user.department || "Cardiology",
-          supervisor: "Dr. Sarah Williams",
-          startDate: "2025-03-15",
-          endDate: "2025-04-15",
-        }
-
-        setUpcomingSessions([...activeSessionsData, ...upcomingSessionsData])
-        setRecentAttendance(attendanceData)
-        setAttendanceStats(statsData)
-        setCurrentRotation(currentRotation)
-        setError(null)
-      } catch (err: any) {
-        console.error("Error fetching dashboard data:", err)
-        setError(err.message || "Failed to load dashboard data")
-      } finally {
-        setLoading(false)
-      }
+      // Set current rotation based on user data
+      setCurrentRotation({
+        hospital: currentUser.hospital || "University Hospital",
+        department: currentUser.department?.name || "Cardiology",
+        supervisor: "Dr. Sarah Williams",
+        startDate: "2025-03-15",
+        endDate: "2025-04-15",
+      })
+    } catch (err) {
+      console.error("Error fetching dashboard data:", err)
+      setError("Failed to load dashboard data. " + (err.message || "Please try again."))
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
     }
-
-    if (user) {
-      fetchDashboardData()
-
-      // Set up an interval to refresh data every minute
-      const intervalId = setInterval(fetchDashboardData, 60 * 1000)
-
-      // Clean up interval on component unmount
-      return () => clearInterval(intervalId)
-    }
-  }, [user, apiRetries])
-
-  const handleRetry = () => {
-    setApiRetries((prev) => prev + 1)
   }
 
-  const handleQRCodeScan = async (data: string) => {
-    try {
-      // Get token from localStorage
-      const token = localStorage.getItem("authToken")
-      if (!token) {
-        throw new Error("No authentication token found")
-      }
+  // Initial data fetch
+  useEffect(() => {
+    fetchDashboardData()
+  }, [currentUser])
 
+  // Handle manual refresh
+  const handleRefresh = () => {
+    setRefreshing(true)
+    fetchDashboardData()
+  }
+
+  const handleQRCodeScan = async (data) => {
+    try {
       // Parse QR code data
       const qrData = JSON.parse(data)
 
       // Mark attendance
-      const response = await fetch(`/api/attendance/${qrData.sessionId}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          verificationMethod: "qrcode",
-          qrCodeData: data,
-        }),
+      await attendanceService.markAttendance({
+        sessionId: qrData.sessionId,
+        verificationMethod: "qrcode",
+        qrCodeData: data,
       })
-
-      if (!response.ok) {
-        throw new Error("Failed to mark attendance")
-      }
 
       // Close scanner and refresh data
       setShowScanner(false)
-
-      // Refresh attendance data
-      const attendanceResponse = await fetch("/api/attendance/history?limit=5", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
-
-      if (attendanceResponse.ok) {
-        const attendanceData = await attendanceResponse.json()
-        setRecentAttendance(attendanceData.data || [])
-      }
-
-      // Refresh stats
-      const statsResponse = await fetch("/api/attendance/stats", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
-
-      if (statsResponse.ok) {
-        const statsData = await statsResponse.json()
-        setAttendanceStats(statsData.data)
-      }
-    } catch (err: any) {
+      fetchDashboardData()
+    } catch (err) {
       console.error("Error marking attendance:", err)
-      setError(err.message || "Failed to mark attendance")
+      setError("Failed to mark attendance: " + (err.message || "Please try again."))
     }
   }
 
-  const getStatusBadge = (status: string) => {
+  const handleGeolocationAttendance = async (sessionId, location) => {
+    try {
+      // Mark attendance
+      await attendanceService.markAttendance({
+        sessionId,
+        verificationMethod: "geolocation",
+        location,
+      })
+
+      // Close geolocation and refresh data
+      setShowGeolocation(false)
+      setSelectedSession(null)
+      fetchDashboardData()
+    } catch (err) {
+      console.error("Error marking attendance:", err)
+      setError("Failed to mark attendance: " + (err.message || "Please try again."))
+    }
+  }
+
+  const getStatusBadge = (status) => {
     switch (status) {
       case "present":
-        return <Badge className="bg-green-500">Present</Badge>
+        return (
+          <Badge className="bg-green-500 flex items-center gap-1">
+            <CheckCircle2 className="h-3 w-3" />
+            Present
+          </Badge>
+        )
       case "late":
-        return <Badge className="bg-yellow-500">Late</Badge>
+        return (
+          <Badge className="bg-yellow-500 flex items-center gap-1">
+            <Clock className="h-3 w-3" />
+            Late
+          </Badge>
+        )
       case "absent":
-        return <Badge className="bg-red-500">Absent</Badge>
+        return (
+          <Badge className="bg-red-500 flex items-center gap-1">
+            <XCircle className="h-3 w-3" />
+            Absent
+          </Badge>
+        )
       case "excused":
-        return <Badge className="bg-blue-500">Excused</Badge>
+        return (
+          <Badge className="bg-blue-500 flex items-center gap-1">
+            <AlertCircle className="h-3 w-3" />
+            Excused
+          </Badge>
+        )
       default:
         return <Badge>Unknown</Badge>
     }
   }
 
-  if (loading) {
+  if (loading && !refreshing) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <RefreshCw className="h-6 w-6 animate-spin mr-2" />
-        Loading...
+        <span>Loading dashboard...</span>
       </div>
     )
   }
 
-  if (!user) {
-    return <DashboardFallback role="student" error="User not authenticated" />
-  }
-
   return (
     <div className="min-h-screen bg-background">
-      <StudentDashboardHeader user={user} />
+      <StudentDashboardHeader user={currentUser} />
 
       <main className="container mx-auto px-4 py-6">
         {error && (
-          <Alert variant="destructive" className="mb-6">
+          <Alert variant="destructive" className="mb-4">
             <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              {error}{" "}
-              <Button variant="link" onClick={handleRetry}>
-                Retry
-              </Button>
-            </AlertDescription>
+            <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
+
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+          <div>
+            <h1 className="text-2xl font-bold">Student Dashboard</h1>
+            <p className="text-muted-foreground">Track your attendance and upcoming sessions</p>
+          </div>
+          <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+        </div>
 
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {/* Current Rotation Card */}
@@ -322,7 +298,9 @@ export default function StudentDashboard() {
                   <div className="space-y-2">
                     <div className="flex justify-between">
                       <span className="text-sm font-medium">Attendance Rate</span>
-                      <span className="text-sm font-medium">{attendanceStats.presentPercentage?.toFixed(1) || 0}%</span>
+                      <span className="text-sm font-medium">
+                        {attendanceStats.presentPercentage ? attendanceStats.presentPercentage.toFixed(1) : 0}%
+                      </span>
                     </div>
                     <Progress value={attendanceStats.presentPercentage || 0} className="h-2" />
                   </div>
@@ -366,9 +344,10 @@ export default function StudentDashboard() {
                 className="w-full flex items-center justify-center gap-2"
                 onClick={() => {
                   if (upcomingSessions.length > 0) {
-                    router.push(`/student/sessions/${upcomingSessions[0]._id}`)
+                    setSelectedSession(upcomingSessions[0])
+                    setShowGeolocation(true)
                   } else {
-                    setError("No upcoming sessions available")
+                    setError("No active sessions available for geolocation check-in")
                   }
                 }}
               >
@@ -379,7 +358,7 @@ export default function StudentDashboard() {
               <Button
                 variant="outline"
                 className="w-full flex items-center justify-center gap-2"
-                onClick={() => router.push("/student/reports")}
+                onClick={() => navigate("/student/reports")}
               >
                 <BarChart3 className="h-5 w-5" />
                 View Detailed Reports
@@ -426,11 +405,17 @@ export default function StudentDashboard() {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => router.push(`/student/sessions/${session._id}`)}
+                              onClick={() => navigate(`/student/sessions/${session._id}`)}
                             >
                               View Details
                             </Button>
-                            <Button size="sm" onClick={() => router.push(`/student/sessions/${session._id}/check-in`)}>
+                            <Button
+                              size="sm"
+                              onClick={() => {
+                                setSelectedSession(session)
+                                setShowGeolocation(true)
+                              }}
+                            >
                               Mark Attendance
                             </Button>
                           </div>
@@ -448,7 +433,7 @@ export default function StudentDashboard() {
               <div className="grid gap-4">
                 {recentAttendance.length > 0 ? (
                   recentAttendance.map((record) => (
-                    <Card key={record.id || record._id}>
+                    <Card key={record._id || record.id}>
                       <CardContent className="p-4">
                         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                           <div className="flex items-start space-x-4">
@@ -491,13 +476,12 @@ export default function StudentDashboard() {
                                   Check-out: {new Date(record.checkOutTime).toLocaleTimeString()}
                                 </p>
                               )}
-                              <p className="text-sm text-muted-foreground mt-1">{record.session.location}</p>
                             </div>
                           </div>
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => router.push(`/student/sessions/${record.session._id}`)}
+                            onClick={() => navigate(`/student/sessions/${record.session._id}`)}
                           >
                             View Details
                           </Button>
@@ -530,17 +514,41 @@ export default function StudentDashboard() {
                 <CardDescription>Scan the QR code displayed by your faculty to mark attendance</CardDescription>
               </CardHeader>
               <CardContent className="flex flex-col items-center">
-                <div className="bg-muted w-full aspect-square rounded-lg flex items-center justify-center mb-4">
-                  <QrCode className="h-16 w-16 text-muted-foreground" />
-                  <p className="sr-only">QR Code Scanner</p>
-                </div>
-                <p className="text-sm text-muted-foreground mb-4">Position the QR code within the frame to scan</p>
+                <QRCodeScanner onScan={handleQRCodeScan} />
               </CardContent>
               <CardFooter className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setShowScanner(false)}>
                   Cancel
                 </Button>
-                <Button>Manual Entry</Button>
+              </CardFooter>
+            </Card>
+          </div>
+        )}
+
+        {/* Geolocation Attendance Modal */}
+        {showGeolocation && selectedSession && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <Card className="w-full max-w-md">
+              <CardHeader>
+                <CardTitle>Geolocation Attendance</CardTitle>
+                <CardDescription>Mark attendance using your current location</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <GeolocationAttendance
+                  session={selectedSession}
+                  onSubmit={(location) => handleGeolocationAttendance(selectedSession._id, location)}
+                />
+              </CardContent>
+              <CardFooter className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowGeolocation(false)
+                    setSelectedSession(null)
+                  }}
+                >
+                  Cancel
+                </Button>
               </CardFooter>
             </Card>
           </div>
@@ -549,3 +557,5 @@ export default function StudentDashboard() {
     </div>
   )
 }
+
+export default StudentDashboard

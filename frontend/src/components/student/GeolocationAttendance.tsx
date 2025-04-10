@@ -165,4 +165,3 @@ export const GeolocationAttendance: React.FC<GeolocationAttendanceProps> = ({ se
     </div>
   )
 }
-

@@ -76,4 +76,3 @@ export function DashboardFallback({ role, error, onRetry }: DashboardFallbackPro
     </div>
   )
 }
-

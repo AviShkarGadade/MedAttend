@@ -123,4 +123,3 @@ export const FacultyDashboardHeader: React.FC<FacultyDashboardHeaderProps> = ({ 
     </header>
   )
 }
-

@@ -306,4 +306,3 @@ export const ManualAttendance: React.FC<ManualAttendanceProps> = ({ session, onC
     </Card>
   )
 }
-
