@@ -25,9 +25,9 @@ export default function Home() {
 
       <main className="flex-1 container mx-auto px-4 py-8">
         <section className="mb-12 text-center">
-          <h1 className="text-4xl font-bold mb-4">Medical Rotation Attendance Management</h1>
+          <h1 className="text-4xl font-bold mb-4">Medical Intern Attendance Management</h1>
           <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-            Streamline attendance tracking for medical interns across multiple hospital rotations with geolocation and
+            Streamline attendance tracking for medical interns across multiple hospital rotations with 
             QR code verification.
           </p>
         </section>
@@ -53,7 +53,7 @@ export default function Home() {
             <CardHeader>
               <ClipboardCheck className="h-8 w-8 text-primary mb-2" />
               <CardTitle>Verified Attendance</CardTitle>
-              <CardDescription>Geolocation and QR code verification for accurate tracking</CardDescription>
+              <CardDescription> QR code verification for accurate tracking</CardDescription>
             </CardHeader>
           </Card>
 
