@@ -5,21 +5,17 @@ const path = require("path")
 const dotenv = require("dotenv")
 const connectDB = require("./config/db")
 
-// Load environment variables
 dotenv.config()
 
 // Connect to database
 connectDB()
 
-// Initialize Express
 const app = express()
 
-// Middleware
 app.use(cors())
 app.use(express.json())
 app.use(morgan("dev"))
 
-// Add a simple test route at the root level
 app.get("/api/test", (req, res) => {
   res.status(200).json({
     success: true,
@@ -43,22 +39,18 @@ app.use("/api/admin", require(path.join(__dirname, "routes", "adminRoutes")))
 console.log("Registering faculty routes at /api/faculty")
 app.use("/api/faculty", require(path.join(__dirname, "routes", "facultyRoutes")))
 
-// Add debug routes
 console.log("Registering debug routes at /api/debug")
 app.use("/api/debug", require("./routes/debugRoutes"))
 
 // Serve static assets in production
 if (process.env.NODE_ENV === "production") {
-  // Set static folder
   app.use(express.static(path.join(__dirname, "../frontend/build")))
 
-  // Any route that is not an API route will be redirected to index.html
   app.get("*", (req, res) => {
     res.sendFile(path.resolve(__dirname, "../frontend/build", "index.html"))
   })
 }
 
-// Error handling middleware
 app.use((err, req, res, next) => {
   console.error("Server error:", err.stack)
   res.status(500).json({

@@ -4,9 +4,6 @@ const User = require("../models/User")
 const Notification = require("../models/Notification")
 const { calculateDistance } = require("../utils/geolocation")
 
-// @desc    Mark attendance
-// @route   POST /api/attendance
-// @access  Private/Student
 exports.markAttendance = async (req, res) => {
   try {
     const { sessionId, verificationMethod, location, qrCodeData } = req.body
@@ -36,7 +33,6 @@ exports.markAttendance = async (req, res) => {
       })
     }
 
-    // Check if student belongs to the session's department and year
     if (session.department.toString() !== req.user.department.toString() || session.year !== req.user.year) {
       return res.status(403).json({
         success: false,
@@ -44,7 +40,6 @@ exports.markAttendance = async (req, res) => {
       })
     }
 
-    // Check if attendance already exists
     const existingAttendance = await Attendance.findOne({
       session: sessionId,
       student: req.user._id,
@@ -213,9 +208,6 @@ exports.markAttendance = async (req, res) => {
   }
 }
 
-// @desc    Get attendance for a session
-// @route   GET /api/sessions/:sessionId/attendance
-// @access  Private/Faculty
 exports.getSessionAttendance = async (req, res) => {
   try {
     const { sessionId } = req.params
@@ -230,7 +222,6 @@ exports.getSessionAttendance = async (req, res) => {
       })
     }
 
-    // Check authorization for faculty
     if (req.user.role === "faculty" && session.faculty.toString() !== req.user._id.toString()) {
       return res.status(403).json({
         success: false,
@@ -238,7 +229,6 @@ exports.getSessionAttendance = async (req, res) => {
       })
     }
 
-    // Build query
     const query = { session: sessionId }
     if (status) {
       query.status = status
@@ -254,13 +244,11 @@ exports.getSessionAttendance = async (req, res) => {
       year: session.year,
     }).select("_id name studentId")
 
-    // Create a map of student IDs to attendance records
     const attendanceMap = attendance.reduce((map, record) => {
       map[record.student._id.toString()] = record
       return map
     }, {})
 
-    // Create a complete attendance list including absent students
     const completeAttendance = students.map((student) => {
       const record = attendanceMap[student._id.toString()]
       if (record) {
@@ -296,9 +284,6 @@ exports.getSessionAttendance = async (req, res) => {
   }
 }
 
-// @desc    Update attendance
-// @route   PUT /api/attendance/:id
-// @access  Private/Faculty
 exports.updateAttendance = async (req, res) => {
   try {
     const { status, notes } = req.body
@@ -316,7 +301,6 @@ exports.updateAttendance = async (req, res) => {
       })
     }
 
-    // Check authorization
     if (req.user.role === "faculty" && attendance.session.faculty.toString() !== req.user._id.toString()) {
       return res.status(403).json({
         success: false,
@@ -346,9 +330,6 @@ exports.updateAttendance = async (req, res) => {
   }
 }
 
-// @desc    Mark checkout
-// @route   PUT /api/attendance/:id/checkout
-// @access  Private/Student
 exports.markCheckout = async (req, res) => {
   try {
     // Find attendance
@@ -361,7 +342,6 @@ exports.markCheckout = async (req, res) => {
       })
     }
 
-    // Check authorization
     if (attendance.student.toString() !== req.user._id.toString()) {
       return res.status(403).json({
         success: false,
@@ -369,7 +349,6 @@ exports.markCheckout = async (req, res) => {
       })
     }
 
-    // Check if already checked out
     if (attendance.checkOutTime) {
       return res.status(400).json({
         success: false,
@@ -377,7 +356,6 @@ exports.markCheckout = async (req, res) => {
       })
     }
 
-    // Update checkout time
     attendance.checkOutTime = new Date()
     await attendance.save()
 
@@ -462,9 +440,6 @@ exports.getAttendanceHistory = async (req, res) => {
   }
 }
 
-// @desc    Get attendance statistics
-// @route   GET /api/attendance/stats
-// @access  Private
 exports.getAttendanceStats = async (req, res) => {
   try {
     const { departmentId, year, startDate, endDate } = req.query
@@ -482,11 +457,9 @@ exports.getAttendanceStats = async (req, res) => {
       dateFilter.date = { $lte: new Date(endDate) }
     }
 
-    // Build query based on user role
     let query = {}
 
     if (req.user.role === "student") {
-      // Students can only see their own stats
       const sessions = await Session.find({
         department: req.user.department,
         year: req.user.year,
@@ -500,7 +473,6 @@ exports.getAttendanceStats = async (req, res) => {
         session: { $in: sessionIds },
       }
     } else if (req.user.role === "faculty") {
-      // Faculty can see stats for their department and sessions
       const sessions = await Session.find({
         faculty: req.user._id,
         ...dateFilter,
@@ -512,7 +484,6 @@ exports.getAttendanceStats = async (req, res) => {
         session: { $in: sessionIds },
       }
     } else if (req.user.role === "admin") {
-      // Admins can see all stats with optional filters
       const sessionQuery = { ...dateFilter }
 
       if (departmentId) {
@@ -531,7 +502,6 @@ exports.getAttendanceStats = async (req, res) => {
       }
     }
 
-    // Get attendance stats
     const stats = await Attendance.aggregate([
       { $match: query },
       {
@@ -608,10 +578,8 @@ exports.generateAttendanceReport = async (req, res) => {
     }
 
     if (req.user.role === "faculty") {
-      // Faculty can only see their own sessions
       sessionQuery.faculty = req.user._id
     } else if (departmentId) {
-      // Admin can filter by department
       sessionQuery.department = departmentId
     }
 
@@ -619,7 +587,6 @@ exports.generateAttendanceReport = async (req, res) => {
       sessionQuery.year = Number.parseInt(year)
     }
 
-    // Get sessions
     const sessions = await Session.find(sessionQuery)
       .populate("faculty", "name")
       .populate("department", "name")
@@ -628,14 +595,12 @@ exports.generateAttendanceReport = async (req, res) => {
 
     const sessionIds = sessions.map((session) => session._id)
 
-    // Get attendance records
     const attendanceRecords = await Attendance.find({
       session: { $in: sessionIds },
     })
       .populate("student", "name studentId")
       .populate("session", "title date startTime endTime")
 
-    // Group attendance by student
     const studentAttendance = {}
 
     attendanceRecords.forEach((record) => {
@@ -673,7 +638,6 @@ exports.generateAttendanceReport = async (req, res) => {
       studentAttendance[studentId].stats.total++
     })
 
-    // Add absent records for students who didn't mark attendance
     const students = await User.find({
       role: "student",
       department: departmentId || req.user.department,
@@ -686,7 +650,6 @@ exports.generateAttendanceReport = async (req, res) => {
       students.forEach((student) => {
         const studentId = student._id.toString()
 
-        // Initialize student record if not exists
         if (!studentAttendance[studentId]) {
           studentAttendance[studentId] = {
             student: {
@@ -722,7 +685,6 @@ exports.generateAttendanceReport = async (req, res) => {
       })
     })
 
-    // Calculate percentages
     Object.values(studentAttendance).forEach((record) => {
       if (record.stats.total > 0) {
         record.stats.presentPercentage = (record.stats.present / record.stats.total) * 100
@@ -732,9 +694,7 @@ exports.generateAttendanceReport = async (req, res) => {
       }
     })
 
-    // Format response based on requested format
     if (format === "csv") {
-      // Generate CSV report
       let csv = "Student ID,Student Name,Present,Late,Absent,Excused,Attendance % \n"
 
       Object.values(studentAttendance).forEach((record) => {

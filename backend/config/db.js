@@ -3,14 +3,13 @@ const logger = require('../utils/logger');
 
 const connectDB = async () => {
   try {
-    // Add retry logic and connection options
     const conn = await mongoose.connect(process.env.MONGODB_URI, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
-      serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
+      serverSelectionTimeoutMS: 5000, 
       retryWrites: true,
       retryReads: true,
-      maxPoolSize: 10, // Maintain up to 10 socket connections
+      maxPoolSize: 10, 
     });
 
     logger.info(`MongoDB Connected: ${conn.connection.host}`);
@@ -23,7 +22,6 @@ const connectDB = async () => {
       logger.error(`Please check your MongoDB URI and network connectivity`);
     }
     
-    // Don't exit the process, allow for graceful handling
     throw error;
   }
 };

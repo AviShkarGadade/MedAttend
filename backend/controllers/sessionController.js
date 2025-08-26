@@ -269,9 +269,7 @@ exports.getSessionById = async (req, res) => {
   }
 }
 
-// @desc    Update session
-// @route   PUT /api/sessions/:id
-// @access  Private/Faculty
+
 exports.updateSession = async (req, res) => {
   try {
     let session = await Session.findById(req.params.id)
@@ -343,9 +341,6 @@ exports.updateSession = async (req, res) => {
   }
 }
 
-// @desc    Delete session
-// @route   DELETE /api/sessions/:id
-// @access  Private/Faculty
 exports.deleteSession = async (req, res) => {
   try {
     const session = await Session.findById(req.params.id)
