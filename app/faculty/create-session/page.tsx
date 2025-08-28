@@ -101,73 +101,71 @@ export default function CreateSessionPage() {
   }, [user])
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError(null)
-    setSuccess(null)
+  e.preventDefault()
+  setLoading(true)
+  setError(null)
+  setSuccess(null)
 
-    try {
-      if (!date || !startTime || !endTime || !title || !location || !hospital || !department || !year) {
-        setError("Please fill in all required fields")
-        return
-      }
-
-      const token = localStorage.getItem("authToken")
-      if (!token) {
-        throw new Error("No authentication token found")
-      }
-
-      // Format date as ISO string (YYYY-MM-DD)
-      const formattedDate = date.toISOString().split("T")[0]
-
-      // Create session data
-      const sessionData = {
-        title,
-        description,
-        date: formattedDate,
-        startTime,
-        endTime,
-        department,
-        hospital,
-        location,
-        year: Number.parseInt(year),
-        enableGeolocation,
-        enableQRCode,
-        status: "active", // Set as active by default
-        coordinates: {
-          latitude: 40.7128, // Default coordinates (NYC)
-          longitude: -74.006,
-        },
-      }
-
-      // Create session
-      const response = await fetch("/api/sessions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(sessionData),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.message || "Failed to create session")
-      }
-
-      setSuccess("Session created successfully")
-
-      // Redirect to faculty dashboard after a delay
-      setTimeout(() => {
-        router.push("/faculty/dashboard")
-      }, 1500)
-    } catch (error: any) {
-      console.error("Error creating session:", error)
-      setError(error.message || "Failed to create session")
-    } finally {
-      setLoading(false)
+  try {
+    // Validate required fields
+    if (!date || !startTime || !endTime || !title || !location || !hospital || !department || !year) {
+      setError("Please fill in all required fields")
+      return
     }
+
+    const token = localStorage.getItem("authToken")
+    if (!token) {
+      throw new Error("No authentication token found")
+    }
+
+    // Construct session object with proper Date storage
+    const sessionData = {
+      title,
+      description,
+      date: new Date(date),
+      startTime,
+      endTime,
+      department,
+      hospital,
+      location,
+      year: Number(year),
+      enableGeolocation,
+      enableQRCode,
+      status: "active",
+      coordinates: {
+        latitude: 40.7128, // Default coords
+        longitude: -74.006,
+      },
+      faculty: user?._id, // Attach current faculty
+    }
+
+    const response = await fetch("/api/sessions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(sessionData),
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.message || "Failed to create session")
+    }
+
+    setSuccess("Session created successfully")
+
+    // Redirect to dashboard after short delay
+    setTimeout(() => {
+      router.push("/faculty/dashboard")
+    }, 1000)
+  } catch (error: any) {
+    console.error("Error creating session:", error)
+    setError(error.message || "Failed to create session")
+  } finally {
+    setLoading(false)
   }
+}
 
   return (
     <ProtectedRoute allowedRoles={["faculty"]}>

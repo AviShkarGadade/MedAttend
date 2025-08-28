@@ -24,7 +24,7 @@ export default function LoginPage() {
   const router = useRouter()
   const { user, firebaseUser } = useAuth()
 
-  const handleEmailLogin = async (e) => {
+  const handleEmailLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
 
     try {
@@ -32,12 +32,20 @@ export default function LoginPage() {
       setError("")
 
       // Sign in with Firebase
+      if (!auth) {
+        setError("Authentication service not available.")
+        return
+      }
       await signInWithEmailAndPassword(auth, email, password)
 
       // The AuthProvider will handle the rest (token, backend verification, redirection)
     } catch (err) {
       console.error("Login error:", err)
-      setError(err.message || "Failed to login")
+      setError(
+        typeof err === "object" && err !== null && "message" in err
+          ? String((err as { message?: string }).message)
+          : "Failed to login"
+      )
     } finally {
       setLoading(false)
     }
@@ -49,12 +57,20 @@ export default function LoginPage() {
       setError("")
 
       // Sign in with Google
+      if (!auth) {
+        setError("Authentication service not available.")
+        return
+      }
       await signInWithPopup(auth, googleProvider)
 
       // The AuthProvider will handle the rest
     } catch (err) {
       console.error("Google login error:", err)
-      setError(err.message || "Failed to login with Google")
+      setError(
+        typeof err === "object" && err !== null && "message" in err
+          ? String((err as { message?: string }).message)
+          : "Failed to login with Google"
+      )
     } finally {
       setLoading(false)
     }
@@ -62,6 +78,10 @@ export default function LoginPage() {
 
   const handleSignOut = async () => {
     try {
+      if (!auth) {
+        console.error("Authentication service not available.")
+        return
+      }
       await signOut(auth)
       localStorage.removeItem("authToken")
       localStorage.removeItem("user")
@@ -131,7 +151,7 @@ export default function LoginPage() {
                       <Input
                         id="email"
                         type="email"
-                        placeholder="m.smith@example.com"
+                        placeholder="m.Avi@example.com"
                         className="pl-10"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
