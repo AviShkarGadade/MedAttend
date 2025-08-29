@@ -52,7 +52,7 @@ const SessionSchema = new mongoose.Schema(
     },
     radius: {
       type: Number,
-      default: 100, // Default radius in meters
+      default: 100, 
     },
     enableGeolocation: {
       type: Boolean,
@@ -91,7 +91,6 @@ const SessionSchema = new mongoose.Schema(
   },
 )
 
-// Create indexes for faster queries
 SessionSchema.index({ faculty: 1, date: 1 })
 SessionSchema.index({ department: 1, date: 1 })
 SessionSchema.index({ status: 1 })
