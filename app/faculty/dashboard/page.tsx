@@ -34,7 +34,7 @@ export default function FacultyDashboard() {
         const today = new Date().toISOString().split("T")[0]
         console.log("Today's date:", today)
 
-        
+        // Fetch faculty sessions for today
         const activeSessions = await fetch(`/api/sessions?status=active&date=${today}`, {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -82,8 +82,10 @@ export default function FacultyDashboard() {
     if (user && user.role === "faculty") {
       fetchDashboardData()
 
+      // Set up an interval to refresh data every minute
       const intervalId = setInterval(fetchDashboardData, 60 * 1000)
 
+      // Clean up interval on component unmount
       return () => clearInterval(intervalId)
     }
   }, [user, apiRetries])

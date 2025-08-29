@@ -15,9 +15,7 @@ export default function PendingApprovalPage() {
 
   const handleSignOut = async () => {
     try {
-      if (auth) {
-        await signOut(auth)
-      }
+      await signOut(auth)
       localStorage.removeItem("authToken")
       localStorage.removeItem("user")
       router.push("/login")

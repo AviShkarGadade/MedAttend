@@ -15,7 +15,7 @@ let cachedClient: MongoClient | null = null
 let cachedDb: any = null
 
 export async function connectToDatabase() {
-  
+  // If we already have a connection, use it
   if (cachedClient && cachedDb) {
     return { client: cachedClient, db: cachedDb }
   }
@@ -25,7 +25,7 @@ export async function connectToDatabase() {
   await client.connect()
   const db = client.db(MONGODB_DB)
 
-
+  // Cache the connection
   cachedClient = client
   cachedDb = db
 
