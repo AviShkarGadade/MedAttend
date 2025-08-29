@@ -51,6 +51,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Return user data with role
     console.log(`User authenticated successfully: ${user.email} (${user.role})`)
     return NextResponse.json({
       success: true,

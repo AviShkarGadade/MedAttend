@@ -1,4 +1,6 @@
+// API service functions for making requests to the backend
 
+// Helper function to handle API responses
 async function handleResponse(response: Response) {
   const data = await response.json()
 

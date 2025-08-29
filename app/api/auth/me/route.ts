@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: "User not found" }, { status: 404 })
     }
 
-    
+    // Check if faculty account is approved
     if (user.role === "faculty" && !user.isApproved) {
       console.log(`Faculty account pending approval: ${user.email}`)
       return NextResponse.json(
