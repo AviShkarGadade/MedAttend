@@ -30,8 +30,8 @@ export default function FacultyDashboard() {
           throw new Error("No authentication token found")
         }
 
-        // Get today's date in ISO format (YYYY-MM-DD)
-        const today = new Date().toISOString().split("T")[0]
+        
+        const today = new Date()
         console.log("Today's date:", today)
 
         

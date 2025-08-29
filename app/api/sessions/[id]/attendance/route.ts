@@ -94,13 +94,11 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       return map
     }, {})
 
-    // Create a complete attendance list including absent students
     const completeAttendance = await Promise.all(
       students.map(async (student) => {
         const record = attendanceMap[student._id.toString()]
 
         if (record) {
-          // Populate student info for existing records
           return {
             ...record,
             student: {
@@ -111,7 +109,6 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
             },
           }
         } else {
-          // Create a placeholder for students without attendance records
           return {
             _id: null,
             session: sessionObjectId,

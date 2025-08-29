@@ -131,7 +131,7 @@ export async function GET(request: NextRequest) {
 
     // Populate faculty, department, and hospital information
     const populatedSessions = await Promise.all(
-      sessions.map(async (session) => {
+      sessions.map(async (session: any) => {
         // Populate faculty
         let faculty = null
         if (session.faculty) {
@@ -295,7 +295,7 @@ export async function POST(request: NextRequest) {
       .toArray()
 
     if (students.length > 0) {
-      const notifications = students.map((student) => ({
+      const notifications = students.map((student: any) => ({
         recipient: student._id,
         title: "New Session Created",
         message: `A new session "${sessionData.title}" has been created for ${new Date(sessionData.date).toLocaleDateString()} at ${sessionData.startTime}.`,
