@@ -30,12 +30,10 @@ export default function FacultyDashboard() {
           throw new Error("No authentication token found")
         }
 
-        
-        const today = new Date()
-        console.log("Today's date:", today)
+        const todayIso = new Date().toISOString().split("T")[0]
+        console.log("Today's date:", todayIso)
 
-        
-        const activeSessions = await fetch(`/api/sessions?status=active&date=${today}`, {
+        const activeSessions = await fetch(`/api/sessions?status=active&date=${todayIso}`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },

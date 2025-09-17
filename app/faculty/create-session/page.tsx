@@ -131,12 +131,10 @@ export default function CreateSessionPage() {
       year: Number(year),
       enableGeolocation,
       enableQRCode,
-      status: "active",
       coordinates: {
         latitude: 40.7128, // Default coords
         longitude: -74.006,
       },
-      faculty: user?._id, // Attach current faculty
     }
 
     const response = await fetch("/api/sessions", {

@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { CalendarIcon, Clock, MapPin, Users, QrCode, Plus, Search, Filter, AlertCircle, RefreshCw } from "lucide-react"
 import { FacultyDashboardHeader } from "@/components/faculty-dashboard-header"
-import { useAuth } from "@/components/auth-provider" // Use same auth as dashboard
+import { useAuth } from "@/components/auth-provider" 
 import { DashboardFallback } from "@/components/dashboard-fallback"
 import ProtectedRoute from "@/components/protected-route"
 
@@ -27,7 +27,7 @@ export default function FacultySessions() {
   const [apiRetries, setApiRetries] = useState(0)
   
   const router = useRouter()
-  const { user } = useAuth() // Use consistent auth system
+  const { user } = useAuth() 
 
   useEffect(() => {
     const fetchSessions = async () => {
@@ -79,24 +79,27 @@ export default function FacultySessions() {
   // Helper function to categorize sessions
   const categorizeSessions = (sessions: any[]) => {
     const now = new Date()
-    const today = now.toISOString().split('T')[0]
-    const currentTime = now.toTimeString().split(' ')[0].slice(0, 5) // HH:MM format
-    
-    return sessions.reduce((acc, session) => {
-      const sessionDate = session.date
-      const sessionEndTime = session.endTime
-      
-      // Determine session status
-      if (sessionDate < today || (sessionDate === today && currentTime > sessionEndTime)) {
-        acc.completed.push({ ...session, status: 'completed' })
-      } else if (sessionDate === today && currentTime >= session.startTime && currentTime <= sessionEndTime) {
-        acc.active.push({ ...session, status: 'active' })
-      } else {
-        acc.upcoming.push({ ...session, status: 'upcoming' })
-      }
-      
-      return acc
-    }, { active: [], upcoming: [], completed: [] })
+    const todayStr = now.toISOString().split('T')[0]
+    const currentTime = now.toTimeString().split(' ')[0].slice(0, 5) // HH:MM
+
+    return sessions.reduce(
+      (acc, session) => {
+        const sessionDateStr = new Date(session.date).toISOString().split('T')[0]
+        const sessionStart = session.startTime
+        const sessionEnd = session.endTime
+
+        if (sessionDateStr < todayStr || (sessionDateStr === todayStr && currentTime > sessionEnd)) {
+          acc.completed.push({ ...session, status: 'completed' })
+        } else if (sessionDateStr === todayStr && currentTime >= sessionStart && currentTime <= sessionEnd) {
+          acc.active.push({ ...session, status: 'active' })
+        } else {
+          acc.upcoming.push({ ...session, status: 'upcoming' })
+        }
+
+        return acc
+      },
+      { active: [], upcoming: [], completed: [] } as any,
+    )
   }
 
   const categorizedSessions = categorizeSessions(sessions)
@@ -216,11 +219,11 @@ export default function FacultySessions() {
                     <SelectContent>
                       <SelectItem value="all">All Dates</SelectItem>
                       {/* Generate date options from available sessions */}
-                      {Array.from(new Set(sessions.map(s => s.date)))
+                      {Array.from(new Set(sessions.map(s => new Date(s.date).toISOString().split('T')[0])))
                         .sort()
-                        .map(date => (
-                          <SelectItem key={date} value={date}>
-                            {new Date(date).toLocaleDateString()}
+                        .map(dateStr => (
+                          <SelectItem key={dateStr} value={dateStr}>
+                            {new Date(dateStr).toLocaleDateString()}
                           </SelectItem>
                         ))}
                     </SelectContent>

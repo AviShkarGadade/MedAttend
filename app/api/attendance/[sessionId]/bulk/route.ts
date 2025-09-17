@@ -62,6 +62,11 @@ export async function POST(request: NextRequest, { params }: { params: { session
       return NextResponse.json({ message: "Only faculty or admin can mark attendance" }, { status: 403 })
     }
 
+    // Prevent marking attendance if session already completed/locked
+    if (session.status === "completed" || session.attendanceLocked) {
+      return NextResponse.json({ message: "Attendance is locked for this session" }, { status: 409 })
+    }
+
     // Get attendance data
     const { attendanceRecords } = await request.json()
 
@@ -158,10 +163,16 @@ export async function POST(request: NextRequest, { params }: { params: { session
       }),
     )
 
+    // Mark session as completed and lock further edits
+    await db.collection("sessions").updateOne(
+      { _id: sessionObjectId },
+      { $set: { status: "completed", attendanceLocked: true, updatedAt: new Date() } },
+    )
+
     return NextResponse.json({
       success: true,
       data: results,
-      message: "Bulk attendance processed",
+      message: "Bulk attendance processed and session marked as completed",
     })
   } catch (error: any) {
     console.error("Bulk mark attendance error:", error)

@@ -56,7 +56,6 @@ export default function SessionDetailPage() {
           throw new Error("Session ID is missing")
         }
 
-        // Get token from localStorage
         const token = localStorage.getItem("authToken")
         if (!token) {
           throw new Error("No authentication token found")
@@ -64,11 +63,8 @@ export default function SessionDetailPage() {
 
         console.log("Fetching session with ID:", sessionId)
 
-        // Fetch session details
         const sessionResponse = await fetch(`/api/sessions/${sessionId}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Authorization: `Bearer ${token}` },
         })
 
         if (!sessionResponse.ok) {
@@ -80,11 +76,8 @@ export default function SessionDetailPage() {
         console.log("Session data:", sessionData)
         setSession(sessionData.data)
 
-        // Fetch attendance records
         const attendanceResponse = await fetch(`/api/sessions/${sessionId}/attendance`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Authorization: `Bearer ${token}` },
         })
 
         if (!attendanceResponse.ok) {
@@ -96,13 +89,11 @@ export default function SessionDetailPage() {
           console.log("Attendance data:", attendanceData)
           setAttendanceRecords(attendanceData.data || [])
 
-          // Check if attendance has been taken
           const hasAttendance = attendanceData.data.some(
             (record: any) => record._id !== null && (record.status === "present" || record.status === "late"),
           )
           setAttendanceTaken(hasAttendance)
 
-          // Initialize selected state and status for all students
           const initialSelected: Record<string, boolean> = {}
           const initialStatus: Record<string, string> = {}
           const initialNotes: Record<string, string> = {}
@@ -160,12 +151,13 @@ export default function SessionDetailPage() {
   }
 
   const handleSaveAttendance = async () => {
+    if (attendanceTaken) return // Prevent saving if attendance is already taken
+
     try {
       setSubmitting(true)
       setError(null)
       setSuccess(null)
 
-      // Get selected students
       const selectedStudentIds = Object.keys(selectedStudents).filter((id) => selectedStudents[id])
 
       if (selectedStudentIds.length === 0) {
@@ -173,13 +165,11 @@ export default function SessionDetailPage() {
         return
       }
 
-      // Get token from localStorage
       const token = localStorage.getItem("authToken")
       if (!token) {
         throw new Error("No authentication token found")
       }
 
-      // Prepare attendance records
       const attendanceRecords = selectedStudentIds.map((studentId) => ({
         studentId,
         status: attendanceStatus[studentId] || "absent",
@@ -188,7 +178,6 @@ export default function SessionDetailPage() {
 
       console.log("Submitting attendance records:", attendanceRecords)
 
-      // Submit bulk attendance
       const response = await fetch(`/api/attendance/${sessionId}/bulk`, {
         method: "POST",
         headers: {
@@ -206,18 +195,14 @@ export default function SessionDetailPage() {
       const responseData = await response.json()
       console.log("Attendance response:", responseData)
 
-      // Refresh attendance records
       const attendanceResponse = await fetch(`/api/sessions/${sessionId}/attendance`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       })
 
       if (attendanceResponse.ok) {
         const attendanceResult = await attendanceResponse.json()
         setAttendanceRecords(attendanceResult.data || [])
 
-        // Check if attendance has been taken
         const hasAttendance = attendanceResult.data.some(
           (record: any) => record._id !== null && (record.status === "present" || record.status === "late"),
         )
@@ -226,7 +211,6 @@ export default function SessionDetailPage() {
 
       setSuccess("Attendance saved successfully")
 
-      // Reset selected students
       const resetSelected = { ...selectedStudents }
       Object.keys(resetSelected).forEach((id) => {
         resetSelected[id] = false
@@ -383,6 +367,15 @@ export default function SessionDetailPage() {
                   <CardDescription>Mark and manage student attendance for this session</CardDescription>
                 </CardHeader>
                 <CardContent>
+                  {attendanceTaken && (
+                    <Alert className="mb-4 bg-green-50 border-green-200">
+                      <CheckCircle2 className="h-4 w-4 text-green-500" />
+                      <AlertDescription className="text-green-700">
+                        Attendance has already been recorded for this session and cannot be retaken.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
                   {error && (
                     <Alert variant="destructive" className="mb-4">
                       <AlertCircle className="h-4 w-4" />
@@ -405,11 +398,16 @@ export default function SessionDetailPage() {
                         className="pl-10"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
+                        disabled={attendanceTaken}
                       />
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <Checkbox id="select-all" onCheckedChange={(checked) => handleSelectAll(checked === true)} />
+                      <Checkbox
+                        id="select-all"
+                        onCheckedChange={(checked) => handleSelectAll(checked === true)}
+                        disabled={attendanceTaken}
+                      />
                       <label
                         htmlFor="select-all"
                         className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
@@ -418,7 +416,7 @@ export default function SessionDetailPage() {
                       </label>
                     </div>
 
-                    <Button onClick={handleSaveAttendance} disabled={submitting} className="whitespace-nowrap">
+                    <Button onClick={handleSaveAttendance} disabled={submitting || attendanceTaken} className="whitespace-nowrap">
                       {submitting ? (
                         <>
                           <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
@@ -449,6 +447,7 @@ export default function SessionDetailPage() {
                             <Checkbox
                               checked={selectedStudents[record.student._id]}
                               onCheckedChange={(checked) => handleSelectStudent(record.student._id, checked === true)}
+                              disabled={attendanceTaken}
                             />
                           </div>
                           <div className="col-span-3">
@@ -460,6 +459,7 @@ export default function SessionDetailPage() {
                             <Select
                               value={attendanceStatus[record.student._id] || record.status}
                               onValueChange={(value) => handleStatusChange(record.student._id, value)}
+                              disabled={attendanceTaken}
                             >
                               <SelectTrigger>
                                 <SelectValue />
@@ -497,6 +497,7 @@ export default function SessionDetailPage() {
                               placeholder="Add notes (optional)"
                               value={notes[record.student._id] || record.notes || ""}
                               onChange={(e) => handleNotesChange(record.student._id, e.target.value)}
+                              disabled={attendanceTaken}
                             />
                           </div>
                         </div>
@@ -508,24 +509,6 @@ export default function SessionDetailPage() {
                     )}
                   </div>
                 </CardContent>
-                <CardFooter className="flex justify-between">
-                  <div className="text-sm text-muted-foreground">
-                    {filteredAttendance.length} students in this session
-                  </div>
-                  <Button onClick={handleSaveAttendance} disabled={submitting}>
-                    {submitting ? (
-                      <>
-                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="h-4 w-4 mr-2" />
-                        Save Attendance
-                      </>
-                    )}
-                  </Button>
-                </CardFooter>
               </Card>
             </TabsContent>
 
@@ -533,63 +516,10 @@ export default function SessionDetailPage() {
               <Card>
                 <CardHeader>
                   <CardTitle>Session Details</CardTitle>
-                  <CardDescription>Detailed information about this session</CardDescription>
+                  <CardDescription>Additional information about the session</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    <div>
-                      <h3 className="text-lg font-medium">Description</h3>
-                      <p className="text-muted-foreground mt-1">{session.description || "No description provided"}</p>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <h3 className="text-lg font-medium">Session Information</h3>
-                        <ul className="mt-2 space-y-2">
-                          <li className="flex items-start">
-                            <CalendarIcon className="h-5 w-5 text-muted-foreground mr-2 mt-0.5" />
-                            <div>
-                              <span className="font-medium">Date:</span> {new Date(session.date).toLocaleDateString()}
-                            </div>
-                          </li>
-                          <li className="flex items-start">
-                            <Clock className="h-5 w-5 text-muted-foreground mr-2 mt-0.5" />
-                            <div>
-                              <span className="font-medium">Time:</span> {session.startTime} - {session.endTime}
-                            </div>
-                          </li>
-                          <li className="flex items-start">
-                            <MapPin className="h-5 w-5 text-muted-foreground mr-2 mt-0.5" />
-                            <div>
-                              <span className="font-medium">Location:</span> {session.location}
-                            </div>
-                          </li>
-                        </ul>
-                      </div>
-
-                      <div>
-                        <h3 className="text-lg font-medium">Additional Details</h3>
-                        <ul className="mt-2 space-y-2">
-                          <li>
-                            <span className="font-medium">Department:</span> {session.department?.name}
-                          </li>
-                          <li>
-                            <span className="font-medium">Hospital:</span> {session.hospital?.name}
-                          </li>
-                          <li>
-                            <span className="font-medium">Year:</span> {session.year}
-                          </li>
-                          <li>
-                            <span className="font-medium">Status:</span>{" "}
-                            {session.status.charAt(0).toUpperCase() + session.status.slice(1)}
-                          </li>
-                          <li>
-                            <span className="font-medium">Created:</span> {new Date(session.createdAt).toLocaleString()}
-                          </li>
-                        </ul>
-                      </div>
-                    </div>
-                  </div>
+                  <p>{session.description}</p>
                 </CardContent>
               </Card>
             </TabsContent>

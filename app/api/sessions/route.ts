@@ -88,6 +88,10 @@ export async function GET(request: NextRequest) {
       // Students can only see sessions for their department and year
       query.department = user.department
       query.year = user.year
+      // If no explicit status was provided, default to active + upcoming for students
+      if (!status) {
+        query.status = { $in: ["active", "upcoming"] }
+      }
     }
 
     console.log("Sessions query:", JSON.stringify(query))
@@ -96,7 +100,7 @@ export async function GET(request: NextRequest) {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
 
-    // Find sessions that should be active today
+    // Find sessions that should be active today (skip locked/completed)
     await db.collection("sessions").updateMany(
       {
         date: {
@@ -104,6 +108,7 @@ export async function GET(request: NextRequest) {
           $lt: new Date(today.getTime() + 24 * 60 * 60 * 1000),
         },
         status: "upcoming",
+        attendanceLocked: { $ne: true },
       },
       { $set: { status: "active", updatedAt: new Date() } },
     )
@@ -130,36 +135,51 @@ export async function GET(request: NextRequest) {
     const total = await db.collection("sessions").countDocuments(query)
 
     // Populate faculty, department, and hospital information
+    const toObjectId = (val: any) => {
+      if (!val) return null
+      if (val instanceof ObjectId) return val
+      try {
+        return new ObjectId(val)
+      } catch {
+        return null
+      }
+    }
+
     const populatedSessions = await Promise.all(
       sessions.map(async (session: any) => {
         // Populate faculty
         let faculty = null
-        if (session.faculty) {
-          faculty = await db.collection("users").findOne({ _id: new ObjectId(session.faculty) })
+        const facultyId = toObjectId(session.faculty)
+        if (facultyId) {
+          faculty = await db.collection("users").findOne({ _id: facultyId })
         }
 
         // Populate department
         let department = null
-        if (session.department) {
-          department = await db.collection("departments").findOne({ _id: new ObjectId(session.department) })
+        const departmentIdForPop = toObjectId(session.department)
+        if (departmentIdForPop) {
+          department = await db.collection("departments").findOne({ _id: departmentIdForPop })
         }
 
         // Populate hospital
         let hospital = null
-        if (session.hospital) {
-          hospital = await db.collection("hospitals").findOne({ _id: new ObjectId(session.hospital) })
+        const hospitalIdForPop = toObjectId(session.hospital)
+        if (hospitalIdForPop) {
+          hospital = await db.collection("hospitals").findOne({ _id: hospitalIdForPop })
         }
 
         // Get attendance count for this session
-        const attendanceCount = await db.collection("attendance").countDocuments({
-          session: new ObjectId(session._id),
-          status: { $in: ["present", "late"] },
-        })
+        const sessionObjectId = toObjectId(session._id)
+        const attendanceCount = await db.collection("attendance").countDocuments(
+          sessionObjectId
+            ? { session: sessionObjectId, status: { $in: ["present", "late"] } }
+            : { session: session._id, status: { $in: ["present", "late"] } },
+        )
 
         // Get total students for this session
         const totalStudents = await db.collection("users").countDocuments({
           role: "student",
-          department: session.department,
+          department: departmentIdForPop ?? session.department,
           year: session.year,
         })
 
@@ -220,20 +240,48 @@ export async function POST(request: NextRequest) {
     // Get session data from request
     const sessionData = await request.json()
 
-    // Convert string IDs to ObjectIds
+    // Resolve department and hospital from various shapes (ObjectId string, {_id}, or name)
     let departmentId, hospitalId
 
-    try {
-      departmentId = new ObjectId(sessionData.department)
-    } catch (error) {
-      return NextResponse.json({ message: "Invalid department ID format" }, { status: 400 })
+    const resolveId = async (
+      value: any,
+      collectionName: string,
+    ): Promise<{ id: any; nameDoc: any } | null> => {
+      // If object with _id
+      if (value && typeof value === "object" && value._id) {
+        try {
+          return { id: new ObjectId(value._id), nameDoc: null }
+        } catch {}
+      }
+      // If looks like ObjectId string
+      if (typeof value === "string") {
+        try {
+          return { id: new ObjectId(value), nameDoc: null }
+        } catch {}
+      }
+      // If provided as string name or object with name, look up by name
+      const name = typeof value === "string" ? value : value?.name
+      if (name) {
+        const { db } = await connectToDatabase()
+        const doc = await db.collection(collectionName).findOne({ name })
+        if (!doc) return null
+        return { id: doc._id, nameDoc: doc }
+      }
+      return null
     }
 
-    try {
-      hospitalId = new ObjectId(sessionData.hospital)
-    } catch (error) {
-      return NextResponse.json({ message: "Invalid hospital ID format" }, { status: 400 })
+    const resolvedDept = await resolveId(sessionData.department, "departments")
+    const resolvedHosp = await resolveId(sessionData.hospital, "hospitals")
+
+    if (!resolvedDept) {
+      return NextResponse.json({ message: "Invalid or unknown department" }, { status: 400 })
     }
+    if (!resolvedHosp) {
+      return NextResponse.json({ message: "Invalid or unknown hospital" }, { status: 400 })
+    }
+
+    departmentId = resolvedDept.id
+    hospitalId = resolvedHosp.id
 
     // Determine session status based on date
     const sessionDate = new Date(sessionData.date)
@@ -268,12 +316,17 @@ export async function POST(request: NextRequest) {
     const department = await db.collection("departments").findOne({ _id: departmentId })
     const hospital = await db.collection("hospitals").findOne({ _id: hospitalId })
 
-    // Get total students for this session
-    const totalStudents = await db.collection("users").countDocuments({
-      role: "student",
-      department: departmentId,
-      year: sessionData.year,
-    })
+    // Get students for this session (department + year)
+    const enrolledStudents = await db
+      .collection("users")
+      .find({
+        role: "student",
+        department: departmentId,
+        year: sessionData.year,
+      })
+      .toArray()
+
+    const totalStudents = enrolledStudents.length
 
     const populatedSession = {
       ...createdSession,
@@ -284,18 +337,25 @@ export async function POST(request: NextRequest) {
       totalStudents,
     }
 
-    // Create notifications for students in this department and year
-    const students = await db
-      .collection("users")
-      .find({
-        role: "student",
-        department: departmentId,
-        year: sessionData.year,
-      })
-      .toArray()
+    // Auto-enroll students by creating initial absent attendance records
+    if (enrolledStudents.length > 0) {
+      const initialAttendance = enrolledStudents.map((student: any) => ({
+        session: result.insertedId,
+        student: student._id,
+        status: "absent",
+        verificationMethod: null,
+        checkInTime: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }))
 
-    if (students.length > 0) {
-      const notifications = students.map((student: any) => ({
+      // Insert many with ordered=false to avoid stopping on duplicates (defensive)
+      await db.collection("attendance").insertMany(initialAttendance, { ordered: false }).catch(() => {})
+    }
+
+    // Create notifications for students in this department and year
+    if (enrolledStudents.length > 0) {
+      const notifications = enrolledStudents.map((student: any) => ({
         recipient: student._id,
         title: "New Session Created",
         message: `A new session "${sessionData.title}" has been created for ${new Date(sessionData.date).toLocaleDateString()} at ${sessionData.startTime}.`,
